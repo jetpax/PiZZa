@@ -6,16 +6,9 @@
 # reading shell code.
 
 arm_64bit=1
-
-# Mini-UART (uart1) on GPIO 14/15 at 115200 baud is the safe default
-# console: every USB-serial adapter handles it, and start.elf does
-# nothing special with the UART_CLK. Use this as a fallback if the
-# image's primary USB-CDC console doesn't enumerate on your host.
-#
-# enable_uart=1 also locks the core clock at 250 MHz so the mini-UART
-# integer baud divisor stays valid across CPU frequency changes.
+# enable_uart=1 routes the mini-UART to GPIO 14/15 and locks the core
+# clock so its baud divisor stays valid.
 enable_uart=1
 core_freq=250
-
 kernel_address=0x200000
 kernel=zephyr.bin

@@ -183,7 +183,7 @@ the corresponding GitHub Release. It bundles:
 | microSD (external slot) | BCM283x legacy SDHost | [zp13](https://github.com/jetpax/zephyr/tree/zp13-sdhc-bcm2835-sdhost) |
 | SDIO (on-chip Wi-Fi bus) | Arasan SDHCI | [zp14](https://github.com/jetpax/zephyr/tree/zp14-sdhc-bcm2835-sdhci) |
 | Wi-Fi | brcmfmac, native L2, WPA2-PSK | [zp16](https://github.com/jetpax/zephyr/tree/zp16-wifi-brcmfmac) |
-| Wi-Fi firmware blobs | **Bundled into `zephyr.bin`** at build time (via `hal_broadcom` + `west blobs fetch`). PINN's recovery partition also ships the same blobs at `/lib/firmware/brcm/`, ready for a future runtime FS-load path. | [hal_broadcom](https://github.com/jetpax/hal_broadcom) |
+| Wi-Fi firmware blobs | **Bundled into `zephyr.bin`** at build time (via `hal_broadcom` + `west blobs fetch` from `rpi-distro/firmware-nonfree`). | [hal_broadcom](https://github.com/jetpax/hal_broadcom) |
 
 ## Rebuilding from source
 
@@ -223,11 +223,14 @@ the `EXTRA_ZEPHYR_MODULES` dance goes away.
 
 Currently both the upstream-bound build and the PiZZa-bound build
 compile the brcmfmac firmware into `zephyr.bin` via `hal_broadcom`
-(see step 3 above). PINN's recovery partition also ships the same
-blobs at `/lib/firmware/brcm/` — they're there for free on any
-PINN-imaged card. A future runtime FS-load path will let `zephyr.bin`
-slim down by ~500 KB and pick the blobs straight off the SD, but
-that code is not yet in `zp16-wifi-brcmfmac`.
+(see step 3 above). A future runtime FS-load path would let
+`zephyr.bin` slim down by ~500 KB and read
+`brcmfmac43436s-sdio.{bin,txt}` from the SD filesystem instead — but
+that code is not yet in `zp16-wifi-brcmfmac`. Note: the firmware
+files are not on the PINN recovery partition itself; they ship
+inside the per-OS images PINN can install (Raspberry Pi OS Lite,
+etc.) on a separate ext4 root partition, which Zephyr cannot
+currently read.
 
 ## Troubleshooting
 
