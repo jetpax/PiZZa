@@ -1,9 +1,4 @@
-# PiZZa — Zephyr on the Raspberry Pi Zero 2 W
-
-> **Pi**·**Z**(ero) **2** (W) **a**(rch) — a pre-built [Zephyr
-> RTOS](https://zephyrproject.org/) image for the Raspberry Pi Zero 2 W,
-> ready to drop onto a [PINN](https://github.com/procount/pinn)-imaged
-> SD card.
+# # PiZZa — Raspberry Pi Zero on Zephyr
 
 Boots to a shell over a **USB-CDC ACM console** — plug a single
 micro-USB cable from the Pi into your laptop and the Pi shows up as
@@ -105,7 +100,15 @@ images it knows about:
 1. Launch Pi Imager.
 2. Choose your microSD card under **Storage**.
 3. Under **OS** scroll to and click **Misc utility images**.
+
+<img width="1584" height="1188" alt="image" src="https://github.com/user-attachments/assets/40a27b4f-a48c-42b5-9f1f-097fe0e21bcc" />
+
+
 4. Pick **PINN — A multi-boot OS installer with OS admin features**.
+
+
+<img width="1584" height="1188" alt="image" src="https://github.com/user-attachments/assets/7de96605-a242-423f-94b4-7825f6de18f3" />
+
 5. Click **Next** → write. Eject when done.
 
 PINN sets up the recovery partition (`bootcode.bin`, `start.elf`,
