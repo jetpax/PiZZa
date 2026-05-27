@@ -37,7 +37,7 @@ out of scope. Legend: ✅ enabled · 🚧 planned · ❌ not planned · — N/A.
 | GPIO + interrupts | ✅ | BCM2711 family driver + bcm2835 pull control |
 | SPI (SPI0) | ✅ | polled controller, loopback-tested |
 | I²S / PCM | ✅ | DMA-driven; cyclic mode for streaming |
-| I²C (BSC0 / BSC1) | 🚧 | planned |
+| I²C (BSC1) | ✅ | BCM2835 BSC driver, IRQ-driven; GPIO 2/3 ALT0, 100 kHz default. `i2c scan i2c@3f804000` from the shell. |
 | PWM | 🚧 | planned |
 | 1-Wire | ❌ | not planned |
 | **Sensors / System** | | |
