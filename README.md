@@ -23,6 +23,16 @@ instead of the fork.
 > upstream. Image bumps will land as new GitHub Releases here, not as
 > commits to this repo.
 
+## Hardware compatibility
+
+| Board | Supported? | Notes |
+| --- | --- | --- |
+| **Raspberry Pi Zero 2 W** | ✅ Yes — the target | Tested. BCM2710A1, Cortex-A53 quad, CYW43439 SDIO Wi-Fi. |
+| **Original Raspberry Pi Zero / Pi Zero W** | ❌ No | BCM2835, single-core ARM11 (ARMv6, 32-bit). Different architecture; this image is aarch64. |
+| **Raspberry Pi 3 / 3B / 3B+** | ⚠️ Possibly — **untested** | Same Pi 3 / BCM27xx family (BCM2837), same Cortex-A53. Likely needs config tweaks for the different Wi-Fi part (BCM43438 vs CYW43439 → different firmware blob), Ethernet PHY, and HAT pin layout. Open an issue if you try it. |
+| **Raspberry Pi 4 / 5** | ❌ No | BCM2711 / BCM2712, GIC-based, different MMIO base; uses the upstream [`rpi_4b`](https://docs.zephyrproject.org/latest/boards/raspberrypi/rpi_4b/doc/index.html) / `rpi_5` boards. |
+| **Raspberry Pi Pico / Pico 2 (RP2040 / RP2350)** | ❌ No | Different SoC family entirely. |
+
 ## What you need
 
 | Item | Notes |
@@ -173,13 +183,13 @@ the corresponding GitHub Release. It bundles:
 | microSD (external slot) | BCM283x legacy SDHost | [zp13](https://github.com/jetpax/zephyr/tree/zp13-sdhc-bcm2835-sdhost) |
 | SDIO (on-chip Wi-Fi bus) | Arasan SDHCI | [zp14](https://github.com/jetpax/zephyr/tree/zp14-sdhc-bcm2835-sdhci) |
 | Wi-Fi | brcmfmac, native L2, WPA2-PSK | [zp16](https://github.com/jetpax/zephyr/tree/zp16-wifi-brcmfmac) |
-| Wi-Fi firmware | hal_broadcom module (blobs from `rpi-distro/firmware-nonfree`) | [hal_broadcom](https://github.com/jetpax/hal_broadcom) |
+| Wi-Fi firmware blobs | **Bundled into `zephyr.bin`** at build time (via `hal_broadcom` + `west blobs fetch`). PINN's recovery partition also ships the same blobs at `/lib/firmware/brcm/`, ready for a future runtime FS-load path. | [hal_broadcom](https://github.com/jetpax/hal_broadcom) |
 
 ## Rebuilding from source
 
 For the impatient there's a release binary on
-[Releases](https://github.com/jetpax/PiZZa/releases). For
-everyone else:
+[Releases](https://github.com/jetpax/PiZZa/releases). For everyone
+else:
 
 ```sh
 # 1. Bring up a Zephyr workspace per upstream docs
@@ -208,6 +218,16 @@ EXTRA_ZEPHYR_MODULES="$PWD/modules/hal/broadcom" \
 
 When the upstream PRs land and `hal_broadcom` gets a `west.yml` entry,
 the `EXTRA_ZEPHYR_MODULES` dance goes away.
+
+### Note on Wi-Fi firmware loading
+
+Currently both the upstream-bound build and the PiZZa-bound build
+compile the brcmfmac firmware into `zephyr.bin` via `hal_broadcom`
+(see step 3 above). PINN's recovery partition also ships the same
+blobs at `/lib/firmware/brcm/` — they're there for free on any
+PINN-imaged card. A future runtime FS-load path will let `zephyr.bin`
+slim down by ~500 KB and pick the blobs straight off the SD, but
+that code is not yet in `zp16-wifi-brcmfmac`.
 
 ## Troubleshooting
 
