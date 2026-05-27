@@ -1,10 +1,12 @@
-# Zephyr on the Raspberry Pi Zero 2 W — pre-built image + PINN installer
+# PiZZa — Zephyr on the Raspberry Pi Zero 2 W
 
-A pre-built [Zephyr RTOS](https://zephyrproject.org/) image for the
-**Raspberry Pi Zero 2 W**, ready to drop onto a
-[PINN](https://github.com/procount/pinn)-imaged SD card. Boots to a shell
-over the PL011 UART with the BCM2710 peripherals, microSD, USB UDC, and
-SDIO Wi-Fi (CYW43439) enabled.
+> **Pi**·**Z**(ero) **2** (W) **a**(rch) — a pre-built [Zephyr
+> RTOS](https://zephyrproject.org/) image for the Raspberry Pi Zero 2 W,
+> ready to drop onto a [PINN](https://github.com/procount/pinn)-imaged
+> SD card.
+
+Boots to a shell over the PL011 UART with the BCM2710 peripherals,
+microSD, USB UDC, and SDIO Wi-Fi (CYW43439) enabled.
 
 This is the user-facing distribution side of the
 **[jetpax/zephyr](https://github.com/jetpax/zephyr) fork**, which is
@@ -37,15 +39,15 @@ The PL011 baud-rate point is load-bearing: see the
    [PINN install instructions](https://github.com/procount/pinn#instructions);
    on macOS the recovery partition auto-mounts as `/Volumes/RECOVERY`.
 2. **Download the latest `zephyr.bin`** from
-   [Releases](https://github.com/jetpax/rpi-zero-2w-pinn/releases/latest)
+   [Releases](https://github.com/jetpax/PiZZa/releases/latest)
    (or directly from
    [`jetpax/zephyr` releases](https://github.com/jetpax/zephyr/releases/latest)
    — the binary is the same).
 3. **Clone or download this repo:**
 
    ```sh
-   git clone https://github.com/jetpax/rpi-zero-2w-pinn.git
-   cd rpi-zero-2w-pinn
+   git clone https://github.com/jetpax/PiZZa.git
+   cd PiZZa
    ```
 
 4. **Run the installer:**
@@ -146,7 +148,7 @@ the corresponding GitHub Release. It bundles:
 ## Rebuilding from source
 
 For the impatient there's a release binary on
-[Releases](https://github.com/jetpax/rpi-zero-2w-pinn/releases). For
+[Releases](https://github.com/jetpax/PiZZa/releases). For
 everyone else:
 
 ```sh
@@ -195,7 +197,7 @@ which targets `/Volumes/bootfs`.
 
 **Wi-Fi connect fails.** Check `wifi scan` returns your SSID; check
 `wifi status` for the actual disconnect reason. Open
-[an issue](https://github.com/jetpax/rpi-zero-2w-pinn/issues) with the
+[an issue](https://github.com/jetpax/PiZZa/issues) with the
 console output.
 
 **Boot hangs after `Starting kernel...`.** Most often the `kernel_address`
