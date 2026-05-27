@@ -23,6 +23,52 @@ instead of the fork.
 > upstream. Image bumps will land as new GitHub Releases here, not as
 > commits to this repo.
 
+## Features
+
+What's in the current PiZZa image, what's on the roadmap, and what's
+out of scope. Legend: ✅ enabled · 🚧 planned · ❌ not planned · — N/A.
+
+| Feature | Status | Notes |
+| --- | :---: | --- |
+| **Network** | | |
+| Wi-Fi station (WPA2-PSK) | ✅ | CYW43439 SDIO via brcmfmac |
+| Wi-Fi access point (softAP) | 🚧 | brcmfmac supports it; needs Zephyr wifi_mgmt glue |
+| Bluetooth (CYW43439 BT side) | 🚧 | shared silicon, separate HCI not yet exercised |
+| Ethernet | — | no PHY on the Pi Zero 2 W |
+| TCP/IP, DNS, DHCP client, HTTP server | ✅ | upstream Zephyr net stack |
+| **Storage** | | |
+| microSD card | ✅ | external slot via BCM283x SDHost |
+| FAT / LittleFS mount | ✅ | upstream Zephyr FS stack |
+| ext4 (for reading PINN-installed OS partitions) | ❌ | not in scope |
+| **Buses & GPIO** | | |
+| GPIO + interrupts | ✅ | BCM2711 family driver + bcm2835 pull control |
+| SPI (SPI0) | ✅ | polled controller, loopback-tested |
+| I²S / PCM | ✅ | DMA-driven; cyclic mode for streaming |
+| I²C (BSC0 / BSC1) | 🚧 | planned |
+| PWM | 🚧 | planned |
+| 1-Wire | ❌ | not planned |
+| **Sensors / System** | | |
+| Die-temperature sensor | ✅ | via VC firmware mailbox (`sensor get vc-thermal`) |
+| Hardware RNG | ✅ | bcm2835-rng entropy driver |
+| HWINFO (OTP board serial) | ✅ | via VC firmware (`hwinfo devid`) |
+| **Console / Debug** | | |
+| USB-CDC ACM over micro-USB | ✅ | primary; runs the Pi from host USB power |
+| Mini-UART @ 115200 on GPIO 14/15 | ✅ | fallback, default config.txt |
+| PL011 @ 1 Mbaud | ✅ | advanced; needs config.txt + DTS rebuild |
+| **Display / Camera** | | |
+| HDMI | 🚧 | planned |
+| MIPI DSI display | ❌ | not planned |
+| MIPI CSI camera | ❌ | not planned |
+| Composite video | ❌ | not planned |
+| **CPU / Kernel** | | |
+| AArch64 single-core | ✅ | Cortex-A53, core 0 only |
+| SMP (4 cores) | 🚧 | planned; upstream Zephyr BCM2710 limitation today |
+| CPU frequency scaling | 🚧 | runs at idle clock (~600 MHz) from USB power |
+| MMU + cache | ✅ | configured per the BCM2710 SoC tree |
+| **USB** | | |
+| Device mode (UDC, DWC2) | ✅ | drives the CDC ACM console |
+| Host mode | ❌ | not in scope |
+
 ## Hardware compatibility
 
 | Board | Supported? | Notes |
@@ -158,9 +204,11 @@ uart:~$ sensor get vc-thermal              # die temperature
 uart:~$ device list                        # confirm SDHost is READY
 uart:~$ mount /sd                          # if scripted; otherwise see below
 
-# Wi-Fi (CYW43439 via brcmfmac)
+# Wi-Fi (CYW43439 via brcmfmac).
+# -k 1 = WPA2-PSK key-management (the common home-router setting);
+# use -k 0 for an open network or -k 3 for WPA3-SAE.
 uart:~$ wifi scan
-uart:~$ wifi connect "<SSID>" "<PSK>"
+uart:~$ wifi connect -s <ssid> -p <password> -k 1
 uart:~$ wifi status
 uart:~$ net iface
 uart:~$ net dns google.com
