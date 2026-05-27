@@ -1,0 +1,22 @@
+# config.txt template for booting Zephyr on a Raspberry Pi Zero 2 W
+# from a PINN-imaged microSD card.
+#
+# install-to-sdcard.sh writes this content automatically; the file
+# is committed here so reviewers can see the boot config without
+# reading shell code.
+
+arm_64bit=1
+core_freq=250
+
+# Route the PL011 (uart0) to GPIO 14/15 by moving Bluetooth onto the
+# mini-UART. The PL011 has a 16+6-bit fractional baud divider, far
+# more flexible than the mini-UART's integer-only divisor.
+enable_uart=1
+dtoverlay=disable-bt
+
+# 1 Mbaud lands on an exact integer divisor at the default 48 MHz
+# PL011 UART_CLK (IBRD=3, FBRD=0 -> 48 MHz / 16 / 3 = 1 MHz exactly).
+init_uart_baud=1000000
+
+kernel_address=0x200000
+kernel=zephyr.bin
