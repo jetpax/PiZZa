@@ -13,7 +13,8 @@ itself staging the upstream contribution under discussion in RFC
 When the staged PRs merge into `zephyrproject-rtos/zephyr`, this repo
 will simply point at upstream tags instead of the fork.
 
-<img width="721" height="680" alt="image" src="https://github.com/user-attachments/assets/bb936082-00a8-4c35-9752-b6ceff9d3a5c" />
+<img width="1510" height="891" alt="image" src="https://github.com/user-attachments/assets/898c85b2-4da9-4e64-8681-c0b1528622be" />
+
 
 
 ## Features
