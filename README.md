@@ -124,18 +124,11 @@ partition auto-mounts as `/Volumes/RECOVERY`; on Linux it's typically
 
 ## Install Zephyr
 
-> **No pre-built binary released yet.** Image bumps will land on the
-> [PiZZa Releases](https://github.com/jetpax/PiZZa/releases) page once
-> the upstream RFC discussion settles. Until then, follow
-> [Rebuilding from source](#rebuilding-from-source) to produce
-> `zephyr.bin` yourself — the install steps below work identically
-> once you have one.
-
-1. **Get a `zephyr.bin`.** Either grab one from
-   [PiZZa Releases](https://github.com/jetpax/PiZZa/releases) (when
-   available; identical artifact mirrored on
-   [`jetpax/zephyr` releases](https://github.com/jetpax/zephyr/releases))
-   or build from source per the section below.
+1. **Download `zephyr.bin`** from
+   [PiZZa Releases](https://github.com/jetpax/PiZZa/releases/latest)
+   (identical artifact mirrored on
+   [`jetpax/zephyr` releases](https://github.com/jetpax/zephyr/releases/latest)).
+   You can also build from source per the section below.
 2. **Clone or download this repo:**
 
    ```sh
@@ -250,9 +243,8 @@ the corresponding GitHub Release. It bundles:
 
 ## Rebuilding from source
 
-A release binary will land on
-[Releases](https://github.com/jetpax/PiZZa/releases) once the upstream
-RFC discussion settles. Until then everyone builds from source:
+Release binaries live on
+[Releases](https://github.com/jetpax/PiZZa/releases). To build your own:
 
 ```sh
 # 1. Bring up a Zephyr workspace per upstream docs
