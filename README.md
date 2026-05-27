@@ -14,10 +14,9 @@ SDIO Wi-Fi (CYW43439) are all enabled.
 This is the user-facing distribution side of the
 **[jetpax/zephyr](https://github.com/jetpax/zephyr) fork**, which is
 itself staging the upstream contribution under discussion in RFC
-[#TBD](https://github.com/zephyrproject-rtos/zephyr) (link will be filled
-in once the RFC is opened). When the staged PRs merge into
-`zephyrproject-rtos/zephyr`, this repo will simply point at upstream tags
-instead of the fork.
+[zephyr#109880](https://github.com/zephyrproject-rtos/zephyr/issues/109880).
+When the staged PRs merge into `zephyrproject-rtos/zephyr`, this repo
+will simply point at upstream tags instead of the fork.
 
 > **Status:** experimental. The board enablement is not yet merged
 > upstream. Image bumps will land as new GitHub Releases here, not as
