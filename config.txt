@@ -12,3 +12,9 @@ enable_uart=1
 core_freq=250
 kernel_address=0x200000
 kernel=zephyr.bin
+
+# Bring HDMI up at boot even if no monitor is attached when the Pi is
+# powered on. Without this, hot-plugging a cable later leaves the
+# pipeline cold and the Zephyr FB driver's ALLOCATE_BUFFER returns
+# an empty buffer. Harmless when HDMI isn't used.
+hdmi_force_hotplug=1
