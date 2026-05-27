@@ -13,9 +13,8 @@ itself staging the upstream contribution under discussion in RFC
 When the staged PRs merge into `zephyrproject-rtos/zephyr`, this repo
 will simply point at upstream tags instead of the fork.
 
-> **Status:** experimental. The board enablement is not yet merged
-> upstream. Image bumps will land as new GitHub Releases here, not as
-> commits to this repo.
+<img width="721" height="680" alt="image" src="https://github.com/user-attachments/assets/bb936082-00a8-4c35-9752-b6ceff9d3a5c" />
+
 
 ## Features
 
