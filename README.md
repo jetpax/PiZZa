@@ -68,6 +68,13 @@ PINN sets up the recovery partition (`bootcode.bin`, `start.elf`,
 partition auto-mounts as `/Volumes/RECOVERY`; on Linux it's typically
 `/media/$USER/RECOVERY`.
 
+> **Why PINN?** Today the Zephyr image boots straight from the PINN
+> recovery partition and doesn't strictly need a partition manager —
+> a vanilla FAT SD card would work. PINN is in place so that future
+> updates can land as a separate filesystem partition rather than a
+> full kernel reflash. Starting on PINN means no re-imaging when that
+> capability arrives.
+
 ## Install Zephyr
 
 1. **Download `zephyr.bin`** from
