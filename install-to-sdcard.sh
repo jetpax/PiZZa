@@ -22,9 +22,11 @@
 #
 # The script:
 #   1. Copies zephyr.bin into the recovery partition.
-#   2. Replaces config.txt with the rpi_zero_2w boot params (PL011
-#      console on GPIO 14/15 at 1 Mbaud), preserving the original as
-#      config.txt.orig on first run.
+#   2. Replaces config.txt with the rpi_zero_2w boot params
+#      (mini-UART fallback console @ 115200, 64-bit kernel at
+#      0x200000), preserving the original as config.txt.orig on
+#      first run. The primary console is USB-CDC ACM, configured
+#      inside the Zephyr image itself.
 #
 # Pi firmware blobs (bootcode.bin, fixup.dat, start.elf) stay untouched.
 
@@ -79,17 +81,16 @@ cat > "$MOUNT/config.txt" <<'EOF'
 # The previous config.txt is preserved as config.txt.orig.
 
 arm_64bit=1
-core_freq=250
 
-# Route the PL011 (uart0) to GPIO 14/15 by moving Bluetooth onto the
-# mini-UART. The PL011 has a 16+6-bit fractional baud divider, far
-# more flexible than the mini-UART's integer-only divisor.
+# Mini-UART (uart1) on GPIO 14/15 at 115200 baud is the safe default
+# console: every USB-serial adapter handles it, and start.elf does
+# nothing special with the UART_CLK. Use this as a fallback if the
+# image's primary USB-CDC console doesn't enumerate on your host.
+#
+# enable_uart=1 also locks the core clock at 250 MHz so the mini-UART
+# integer baud divisor stays valid across CPU frequency changes.
 enable_uart=1
-dtoverlay=disable-bt
-
-# 1 Mbaud lands on an exact integer divisor at the default 48 MHz
-# PL011 UART_CLK (IBRD=3, FBRD=0 -> 48 MHz / 16 / 3 = 1 MHz exactly).
-init_uart_baud=1000000
+core_freq=250
 
 kernel_address=0x200000
 kernel=zephyr.bin

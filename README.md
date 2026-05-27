@@ -5,8 +5,11 @@
 > ready to drop onto a [PINN](https://github.com/procount/pinn)-imaged
 > SD card.
 
-Boots to a shell over the PL011 UART with the BCM2710 peripherals,
-microSD, USB UDC, and SDIO Wi-Fi (CYW43439) enabled.
+Boots to a shell over a **USB-CDC ACM console** — plug a single
+micro-USB cable from the Pi into your laptop and the Pi shows up as
+a serial device. No external power supply, no USB-serial adapter, no
+GPIO header soldering. BCM2710 peripherals, microSD, USB UDC, and
+SDIO Wi-Fi (CYW43439) are all enabled.
 
 This is the user-facing distribution side of the
 **[jetpax/zephyr](https://github.com/jetpax/zephyr) fork**, which is
@@ -25,32 +28,51 @@ instead of the fork.
 | Item | Notes |
 | --- | --- |
 | Raspberry Pi Zero 2 W | Stock — no soldering, no additional hardware |
-| microSD card, ≥ 4 GB | Imaged with [PINN](https://github.com/procount/pinn) |
-| USB-serial adapter capable of 1 Mbaud | The console is the **PL011** on GPIO 14/15, not the mini-UART. 1 Mbaud is the canonical rate. |
-| Host computer | macOS, Linux, or Windows (with WSL or git-bash for the install script) |
-| 5 V power supply | Standard micro-USB |
+| microSD card, ≥ 4 GB | Imaged with [PINN](https://github.com/procount/pinn) (see below) |
+| Micro-USB cable | Connects the Pi's USB-OTG port to your laptop. Carries **both power and the console**. |
+| Host computer | macOS, Linux, or Windows |
 
-The PL011 baud-rate point is load-bearing: see the
-[UART notes](#why-1-mbaud-on-pl011) at the bottom for context.
+No separate 5 V supply is required: the Pi runs from the host's USB
+port at the BCM2710's idle clock (~600 MHz). Total bench setup is a
+laptop, a cable, and the Pi.
 
-## Install (Mac / Linux)
+A USB-to-serial adapter (FTDI / CP210x / etc.) is **optional** — only
+needed if you want to use the GPIO-header UART as a fallback console.
+See [Console options](#console-options) at the bottom.
 
-1. **Image the SD card with PINN** if you haven't already. Follow the
-   [PINN install instructions](https://github.com/procount/pinn#instructions);
-   on macOS the recovery partition auto-mounts as `/Volumes/RECOVERY`.
-2. **Download the latest `zephyr.bin`** from
-   [Releases](https://github.com/jetpax/PiZZa/releases/latest)
-   (or directly from
+## Image the SD card with PINN
+
+Use the official cross-platform
+[Raspberry Pi Imager](https://www.raspberrypi.com/software/) (v2.0 or
+later — available for macOS, Linux, and Windows). PINN is one of the
+images it knows about:
+
+1. Launch Pi Imager.
+2. Choose your microSD card under **Storage**.
+3. Under **OS** scroll to and click **Misc utility images**.
+4. Pick **PINN — A multi-boot OS installer with OS admin features**.
+5. Click **Next** → write. Eject when done.
+
+PINN sets up the recovery partition (`bootcode.bin`, `start.elf`,
+`fixup.dat`, `config.txt`) that Zephyr boots from. On macOS the
+partition auto-mounts as `/Volumes/RECOVERY`; on Linux it's typically
+`/media/$USER/RECOVERY`.
+
+## Install Zephyr
+
+1. **Download `zephyr.bin`** from
+   [PiZZa Releases](https://github.com/jetpax/PiZZa/releases/latest) or
+   directly from
    [`jetpax/zephyr` releases](https://github.com/jetpax/zephyr/releases/latest)
-   — the binary is the same).
-3. **Clone or download this repo:**
+   — the binary is the same.
+2. **Clone or download this repo:**
 
    ```sh
    git clone https://github.com/jetpax/PiZZa.git
    cd PiZZa
    ```
 
-4. **Run the installer:**
+3. **Run the installer:**
 
    ```sh
    # macOS, PINN card auto-mounted at /Volumes/RECOVERY
@@ -61,11 +83,11 @@ The PL011 baud-rate point is load-bearing: see the
    ```
 
    The script copies `zephyr.bin` into the recovery partition and writes
-   a new `config.txt` with the right boot params (PL011 console at
-   1 Mbaud, 64-bit mode, `kernel_address=0x200000`). Your previous
+   a new `config.txt` with safe defaults (64-bit mode, mini-UART fallback
+   console at 115200, `kernel_address=0x200000`). Your previous
    `config.txt` is preserved as `config.txt.orig` on the first run.
 
-5. **Eject** the card. The installer prints the right one-liner for your
+4. **Eject** the card. The installer prints the right one-liner for your
    OS:
 
    ```sh
@@ -73,21 +95,25 @@ The PL011 baud-rate point is load-bearing: see the
    diskutil eject /Volumes/RECOVERY
    ```
 
-6. **Insert** into the Pi, connect the USB-serial adapter to GPIO
-   14 (TXD, Pi-side) / 15 (RXD) and GND, and power up.
+5. **Insert** into the Pi and plug a micro-USB cable from the Pi's USB
+   port to your laptop. The Pi will draw power and present a USB-CDC
+   serial device in one go.
 
 ## First boot
 
-Open the serial console at **1 Mbaud, 8N1**:
+Once the Pi enumerates over USB it appears on the host as a serial
+device. Open it with any terminal program — CDC ignores the baud
+setting, but a sensible value keeps tools happy:
 
 ```sh
-# macOS, adjust /dev/tty.usbserial-* to your adapter
-tio /dev/tty.usbserial-10 -b 1000000
+# macOS — the device usually shows up as /dev/tty.usbmodem*
+ls /dev/tty.usbmodem*
+tio /dev/tty.usbmodem1234 -b 115200
 
-# Linux
-tio /dev/ttyUSB0 -b 1000000
+# Linux — usually /dev/ttyACM0
+tio /dev/ttyACM0 -b 115200
 
-# Or screen / minicom / picocom, all at 1000000 baud
+# Windows — COMxx in Device Manager under "Ports (COM & LPT)"; PuTTY/Tera Term at 115200
 ```
 
 You should see Zephyr boot and land at:
@@ -95,6 +121,9 @@ You should see Zephyr boot and land at:
 ```
 uart:~$
 ```
+
+If no `usbmodem`/`ttyACM` device appears, fall back to the GPIO mini-UART
+at **115200 baud, 8N1** — see [Console options](#console-options).
 
 ## Try things
 
@@ -129,7 +158,8 @@ the corresponding GitHub Release. It bundles:
 | Subsystem | Driver | Source branch |
 | --- | --- | --- |
 | Board scaffold | rpi_zero_2w + bcm2710 SoC + BCM283x intc | [zp03](https://github.com/jetpax/zephyr/tree/zp03-rpi-zero-2w-board) |
-| Console UART | PL011 (uart0) @ 1 Mbaud | upstream |
+| Primary console | USB-CDC ACM over micro-USB | [zp12](https://github.com/jetpax/zephyr/tree/zp12-usb-dwc2-bcm2710) |
+| Fallback console | Mini-UART (uart1) on GPIO 14/15 @ 115200 | upstream |
 | Timer | ARM architected timer | [zp01](https://github.com/zephyrproject-rtos/zephyr/pull/108775) (in review) |
 | Mini-UART fixes | BCM2711 aux UART | [zp02](https://github.com/zephyrproject-rtos/zephyr/pull/108776) (in review) |
 | GPIO | BCM2835 pull-control extension | [zp04](https://github.com/jetpax/zephyr/tree/zp04-gpio-legacy-pull) |
@@ -181,19 +211,22 @@ the `EXTRA_ZEPHYR_MODULES` dance goes away.
 
 ## Troubleshooting
 
-**No output on the serial console.** First, double-check the baud rate
-is **1000000**, not 115200. Second, you're on **GPIO 14/15 (PL011)**,
-not the mini-UART pins — they're the same physical pins but a different
-internal UART. If you flashed the image with the upstream `rpi_zero_2w`
-helper instead of this one, that one writes a mini-UART config; re-run
-this repo's `install-to-sdcard.sh`.
+**No USB-CDC device appears on the host.** Most often the Pi hasn't
+fully booted yet — give it ~6 s after plug-in. If it still doesn't
+appear, fall back to the GPIO mini-UART at 115200 (see
+[Console options](#console-options)) to inspect the boot log directly.
 
-**`config.txt` says `RECOVERY` doesn't look like a Pi boot partition.**
-The recovery partition needs to have `bootcode.bin`, `start.elf`, and
-`fixup.dat` already present — those come from PINN's imager. If you
-imaged the SD card with PINN they're there; if you used Raspberry Pi
-Imager instead, see the upstream zephyr port's `install-to-sdcard.sh`
-which targets `/Volumes/bootfs`.
+**No output on the GPIO serial console either.** Check the baud is
+**115200, 8N1**, and that you're wired to **GPIO 14 (TXD, Pi-side) /
+GPIO 15 (RXD) / GND**, not the PL011/Bluetooth-shared pins
+(`dtoverlay=disable-bt` is **not** set in the default config.txt).
+
+**Installer says `RECOVERY` doesn't look like a Pi boot partition.**
+The recovery partition needs `bootcode.bin`, `start.elf`, and
+`fixup.dat` already present — those come from PINN. If the card was
+imaged with plain Raspberry Pi OS instead, the mount point is
+`/Volumes/bootfs`, not `/Volumes/RECOVERY` — use the upstream zephyr
+port's `install-to-sdcard.sh` for that layout.
 
 **Wi-Fi connect fails.** Check `wifi scan` returns your SSID; check
 `wifi status` for the actual disconnect reason. Open
@@ -205,19 +238,38 @@ in `config.txt` doesn't match the image's link address. The bundled
 config.txt has `kernel_address=0x200000` which is what the upstream
 rpi_zero_2w board expects.
 
-## Why 1 Mbaud on PL011?
+## Console options
 
-The mini-UART (BCM AUX) has an integer-only baud divisor sourced from a
-250 MHz clock; at high baud the nearest valid divisor produces > 2 %
-error, marginal on adapters that don't auto-recover. The PL011 has a
-16+6-bit fractional divider sourced from a 48 MHz UART_CLK, where a
-baud rate of 1 000 000 lands on **exactly** IBRD=3, FBRD=0, no rounding
-error.
+The image ships with three console paths, in order of preference:
 
-921 600 was tried first but a common macOS USB-serial adapter (logic-
-analyzer confirmed on the wire) produces ~850 kbps when asked for
-921 600 — the device is clean, the host adapter is not. 1 Mbaud is
-unambiguous on both sides.
+### 1. USB-CDC ACM (default — recommended)
+
+Plug a micro-USB cable from the Pi's USB-OTG port to the host. The Pi
+shows up as `/dev/tty.usbmodem*` (macOS), `/dev/ttyACM0` (Linux), or
+a COM port (Windows). No external hardware, no separate power supply.
+This is what the image is optimised for.
+
+### 2. Mini-UART (uart1) on GPIO 14/15 @ 115200 — fallback
+
+Wire a USB-to-serial adapter to GPIO 14 (Pi-TXD) / GPIO 15 (Pi-RXD) /
+GND and open at **115200 baud, 8N1**. Every USB-serial adapter handles
+this rate cleanly; the mini-UART's integer baud divisor is exact at
+115200 with `enable_uart=1` locking the core clock to 250 MHz (which
+the default `config.txt` does). This path is useful if the host can't
+or won't enumerate the USB-CDC console, or if you want to use the
+USB-OTG port for something else (a USB-host device, for instance).
+
+### 3. PL011 (uart0) on GPIO 14/15 @ 1 Mbaud — advanced
+
+The PL011 has a 16+6-bit fractional baud divider sourced from a 48 MHz
+UART_CLK, where 1 000 000 lands on **exactly** IBRD=3, FBRD=0. Fast and
+glitch-free, but requires (a) editing `config.txt` to add
+`dtoverlay=disable-bt` (moves Bluetooth off PL011, freeing GPIO 14/15)
+and `init_uart_baud=1000000`, (b) a rebuild with `zephyr,console = &uart0`
+in the DTS, and (c) a USB-serial adapter that doesn't lie about its
+clock at 1 Mbaud (some macOS adapters produce ~850 kbps when asked for
+921 600 — logic-analyzer confirmed). Use this if you want a sub-millisecond
+log channel for performance work; otherwise stick with USB-CDC.
 
 ## License
 
