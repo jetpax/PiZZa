@@ -13,7 +13,9 @@ itself staging the upstream contribution under discussion in RFC
 When the staged PRs merge into `zephyrproject-rtos/zephyr`, this repo
 will simply point at upstream tags instead of the fork.
 
-<img width="1510" height="891" alt="image" src="https://github.com/user-attachments/assets/898c85b2-4da9-4e64-8681-c0b1528622be" />
+<img width="1590" height="1220" alt="image" src="https://github.com/user-attachments/assets/c639c635-40c3-427d-972d-97d92dab2b53" />
+
+
 
 
 
@@ -50,7 +52,7 @@ out of scope. Legend: ✅ enabled · 🚧 planned · ❌ not planned · — N/A.
 | Mini-UART @ 115200 on GPIO 14/15 | ✅ | fallback, default config.txt |
 | PL011 @ 1 Mbaud | ✅ | advanced; needs config.txt + DTS rebuild |
 | **Display / Camera** | | |
-| HDMI | 🚧 | planned |
+| HDMI | ✅ | Framebuffer with EDID / mode auto-detect |
 | MIPI DSI display | ❌ | not planned |
 | MIPI CSI camera | ❌ | not planned |
 | Composite video | ❌ | not planned |
