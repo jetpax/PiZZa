@@ -1,4 +1,4 @@
-# PiZZa — Raspberry Pi Zero on Zephyr
+# 🍕 PiZZa  — Raspberry Pi Zero with Zephyr
 
 Boots to a shell over a **USB-CDC ACM console** — plug a single
 micro-USB cable from the Pi into your laptop and the Pi shows up as
