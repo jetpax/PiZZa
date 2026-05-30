@@ -1,0 +1,32 @@
+/*
+ * PiZZa -- USB-CDC overlay for rpi_zero_w.
+ *
+ * Enables the VC mailbox + firmware (needed to power-on the USB PHY)
+ * and the DWC2 USB controller with a CDC ACM child for the shell.
+ * Boot logs + LOG_* remain on the AUX mini-UART (uart1, set up by
+ * the board DTS at 115200 on GPIO 14/15).
+ */
+
+&mbox0 {
+	status = "okay";
+};
+
+&firmware {
+	status = "okay";
+};
+
+&usb {
+	status = "okay";
+
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+		label = "PiZZa shell (USB CDC ACM)";
+	};
+};
+
+/ {
+	chosen {
+		zephyr,console = &uart1;
+		zephyr,shell-uart = &cdc_acm_uart0;
+	};
+};
