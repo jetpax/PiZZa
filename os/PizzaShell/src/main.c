@@ -51,19 +51,23 @@
 #include <zephyr/net/wifi_mgmt.h>
 #endif
 
-#define PIZZA_VERSION "v0.4.0"
+#define PIZZA_VERSION "v0.4.1"
 
 /* Per-board identity + the static "info" lines. */
 #if defined(CONFIG_SOC_BCM2835)
 #define PIZZA_BOARD_NAME  "Raspberry Pi Zero W"
 #define PIZZA_SOC_STR     "Broadcom BCM2835 (ARM1176JZF-S, ARMv6KZ AArch32)"
-#define PIZZA_CONSOLE_STR "AUX mini-UART on GPIO 14/15 (you're here)"
-#define PIZZA_LOGS_STR    "--"
 #else
 #define PIZZA_BOARD_NAME  "Raspberry Pi Zero 2 W"
 #define PIZZA_SOC_STR     "Broadcom BCM2710 (Cortex-A53 quad, ARMv8-A AArch64)"
+#endif
+
+#if IS_ENABLED(CONFIG_USBD_CDC_ACM_CLASS)
 #define PIZZA_CONSOLE_STR "USB CDC ACM (you're here)"
 #define PIZZA_LOGS_STR    "PL011 / mini-UART on GPIO 14/15"
+#else
+#define PIZZA_CONSOLE_STR "AUX mini-UART on GPIO 14/15 (you're here)"
+#define PIZZA_LOGS_STR    "--"
 #endif
 
 #define BANNER_TITLE \
