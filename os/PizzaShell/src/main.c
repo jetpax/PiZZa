@@ -33,6 +33,9 @@
 #if DT_HAS_CHOSEN(zephyr_display)
 #include <zephyr/drivers/display.h>
 #endif
+#if IS_ENABLED(CONFIG_RASPBERRYPI_FIRMWARE)
+#include <rpi_fw.h>
+#endif
 #if IS_ENABLED(CONFIG_SENSOR)
 #include <zephyr/drivers/sensor.h>
 #endif
@@ -48,7 +51,7 @@
 #include <zephyr/net/wifi_mgmt.h>
 #endif
 
-#define PIZZA_VERSION "v0.3"
+#define PIZZA_VERSION "v0.4.0"
 
 /* Per-board identity + the static "info" lines. */
 #if defined(CONFIG_SOC_BCM2835)
@@ -189,6 +192,35 @@ static const uint32_t pizza_display_bars[] = {
 	0xFF0000FFU, /* Blue */
 };
 
+/*
+ * EDID-based monitor detection. config.txt's `hdmi_force_hotplug=1`
+ * makes VC bring up a 640x480 fallback framebuffer even when no monitor
+ * is attached, so `device_is_ready()` alone can't see through it.
+ * Asking VC for EDID block 0 returns status == 0 only when a real
+ * monitor is on the cable.
+ */
+static bool pizza_display_has_monitor(void)
+{
+#if IS_ENABLED(CONFIG_RASPBERRYPI_FIRMWARE)
+	const struct device *fw = DEVICE_DT_GET_ONE(raspberrypi_bcm283x_firmware);
+	struct {
+		uint32_t block;
+		uint32_t status;
+		uint8_t edid[128];
+	} req = {0};
+
+	if (!device_is_ready(fw)) {
+		return true;
+	}
+	if (rpi_fw_transfer(fw, RPI_FW_TAG_GET_EDID_BLOCK, &req, sizeof(req)) != 0) {
+		return true;
+	}
+	return req.status == 0;
+#else
+	return true;
+#endif
+}
+
 static void pizza_display_paint(void)
 {
 	const struct device *dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
@@ -197,7 +229,7 @@ static void pizza_display_paint(void)
 	uint16_t w, h;
 	const size_t n = ARRAY_SIZE(pizza_display_bars);
 
-	if (!device_is_ready(dev)) {
+	if (!device_is_ready(dev) || !pizza_display_has_monitor()) {
 		return;
 	}
 	display_get_capabilities(dev, &caps);
@@ -342,7 +374,7 @@ static void pizza_snapshot_display(char *buf, size_t len)
 	const struct device *dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
 	struct display_capabilities caps;
 
-	if (!device_is_ready(dev)) {
+	if (!device_is_ready(dev) || !pizza_display_has_monitor()) {
 		strncpy(buf, "(no monitor detected)", len);
 		buf[len - 1] = '\0';
 		return;
