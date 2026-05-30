@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+
+# Pull in the SAMPLE_USBD_* options used by sample_usbd_init.c (VID, PID,
+# manufacturer/product strings). Required on boards that build the USB
+# device stack; harmless (unused symbols) on console-only boards.
+source "samples/subsys/usb/common/Kconfig.sample_usbd"
+
+source "Kconfig.zephyr"
