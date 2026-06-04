@@ -1,0 +1,54 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * PiZZa Jet demo overlay for rpi_zero_2w.
+ *
+ *   - &mailbox + &firmware: VC property-tag mailbox + framebuffer alloc
+ *   - &vc_fb: HDMI framebuffer at the monitor's native resolution,
+ *     16 bpp RGB565 so Jet's render buffer is the scanout buffer
+ *     (one memcpy per frame, no per-pixel conversion).
+ *   - &usb: single CDC ACM child for the shell, same shape as PizzaShell.
+ *   - uart1 (mini-UART): console + LOG_* on GPIO 14/15 at 115200.
+ */
+
+#include <zephyr/dt-bindings/display/panel.h>
+
+&mbox0 {
+	status = "okay";
+};
+
+&firmware {
+	status = "okay";
+};
+
+&vc_fb {
+	/* No width / height -- driver auto-detects the monitor's native
+	 * mode from VC's EDID negotiation at boot.
+	 */
+	pixel-format = <PANEL_PIXEL_FORMAT_RGB_565>;
+	status = "okay";
+};
+
+&usb {
+	status = "okay";
+
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+		label = "PiZZa Jet shell (USB CDC ACM)";
+	};
+};
+
+/ {
+	chosen {
+		zephyr,console = &uart1;
+		zephyr,shell-uart = &cdc_acm_uart0;
+		zephyr,display = &vc_fb;
+	};
+};
+
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_gpio14>;
+	status = "okay";
+	current-speed = <115200>;
+};
