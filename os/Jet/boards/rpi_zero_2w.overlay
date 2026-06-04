@@ -21,6 +21,14 @@
 	status = "okay";
 };
 
+/* DMA controller used by bcm2835_fb for the backbuffer->fb blit.
+ * The driver claims the first available channel from the mask at
+ * init time (no DT wiring on the fb side).
+ */
+&dma {
+	status = "okay";
+};
+
 &vc_fb {
 	/* No width / height -- driver auto-detects the monitor's native
 	 * mode (typically 1824x984) from VC's EDID negotiation at boot.

@@ -364,7 +364,12 @@ int main(void)
 	printk("[jet] display %dx%d RGB565 (backbuffer %zu KiB)\r\n", width,
 	       height, fb_bytes / 1024U);
 
-	uint16_t *backbuf = static_cast<uint16_t *>(k_aligned_alloc(8, fb_bytes));
+	/* 64-byte alignment: cache-line so DMA cache-maintenance never
+	 * sweeps a neighbour, and >= 16-byte so the 128-bit-wide AXI
+	 * reads the fb-blit DMA performs land on aligned addresses
+	 * (misaligned 128-bit reads wedge the channel with an AXI error).
+	 */
+	uint16_t *backbuf = static_cast<uint16_t *>(k_aligned_alloc(64, fb_bytes));
 
 	if (backbuf == nullptr) {
 		printk("[jet] no heap for backbuffer (need %zu bytes; "
@@ -415,7 +420,6 @@ int main(void)
 		demo.shadow_obj->transformScale = true;
 
 		demo.scene->render();
-
 		int rc = display_write(display, 0, 0, &desc, backbuf);
 
 		if (rc < 0) {
