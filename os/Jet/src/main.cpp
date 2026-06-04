@@ -261,14 +261,17 @@ void build_scene(DemoScene &demo, uint16_t *fb, int w, int h)
 	demo.scene->setBackcolor(kBackcolor);
 	demo.scene->setClearBuffer(true);
 
-	/* Lower the camera height and aim slightly above the ball's
-	 * resting altitude. Steep top-down angle made floor cells read
-	 * as 3:1 rectangles; ~7° pitch keeps the grid visible without
-	 * crushing the depth axis.
+	/* Camera tuned so:
+	 *   - the floor's shadow disc at y=-178 stays inside the
+	 *     bottom of the view frustum (was being culled at the
+	 *     previous "nearly horizontal" angle),
+	 *   - all 3 rows of the back-wall grid clear the top edge.
+	 * FOV 70 (vs 60 before) adds enough vertical headroom to fit
+	 * the wall without making the perspective too wide-angle.
 	 */
-	demo.camera.setPosition(0, 120, -360);
-	demo.camera.lookAt(Vector3{0, 60, 360});
-	demo.camera.setFOV(60.0f, w);
+	demo.camera.setPosition(0, 160, -340);
+	demo.camera.lookAt(Vector3{0, 40, 280});
+	demo.camera.setFOV(70.0f, w);
 	demo.camera.nearPlane = 32;
 	demo.camera.farPlane = 8192;
 	demo.scene->setCamera(&demo.camera);
@@ -293,18 +296,18 @@ void build_scene(DemoScene &demo, uint16_t *fb, int w, int h)
 	demo.scene->addObject(demo.floor);
 
 	/* Back wall: same grid helper, rotated 90° around X so it
-	 * stands up. Its local "depth" axis becomes vertical, so we
-	 * spec it shorter than the floor (the wall doesn't need to
-	 * extend below floor level).
+	 * stands up. Local "depth" axis becomes vertical -- 3 rows of
+	 * 200-unit cells = 600 wall height, which fits the frustum
+	 * cleanly with FOV 70. Sat 20 units behind the floor's far edge
+	 * (z=1200 -> wall at z=1220) so coplanar painter's-algo order
+	 * doesn't paint the floor's last gridline over the wall base.
 	 */
-	demo.backwall = createGridFloor(/*width*/2400, /*depth*/1200,
-	                                /*cellsX*/12, /*cellsZ*/6,
+	demo.backwall = createGridFloor(/*width*/2400, /*depth*/600,
+	                                /*cellsX*/12, /*cellsZ*/3,
 	                                /*thickness*/3, &demo.magenta);
 	demo.backwall->setRotation(90, 0, 0);
-	/* Wall plane stands at z=1200. Y centred so the wall's bottom
-	 * meets the floor (y=-180): center = -180 + depth/2 = 420.
-	 */
-	demo.backwall->setPosition(0, 420, 1200);
+	/* Bottom of wall flush with floor (y=-180): center = -180+300 = 120. */
+	demo.backwall->setPosition(0, 120, 1220);
 	demo.backwall->cullingMode = CullingMode::NO_CULLING;
 	demo.scene->addObject(demo.backwall);
 
