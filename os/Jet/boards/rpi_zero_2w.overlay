@@ -23,9 +23,16 @@
 
 &vc_fb {
 	/* No width / height -- driver auto-detects the monitor's native
-	 * mode from VC's EDID negotiation at boot.
+	 * mode (typically 1824x984) from VC's EDID negotiation at boot.
+	 *
+	 * render-width / render-height set the virtual framebuffer size.
+	 * VC's HVS hardware scaler upscales this to the scanout
+	 * resolution -- the CPU paints ~900 KiB per frame instead of
+	 * the full 3.5 MiB, ~4x less bandwidth into uncached DRAM.
 	 */
 	pixel-format = <PANEL_PIXEL_FORMAT_RGB_565>;
+	render-width = <912>;
+	render-height = <492>;
 	status = "okay";
 };
 
