@@ -391,6 +391,34 @@ void build_scene(DemoScene &demo, uint16_t *fb, int w, int h)
 	demo.scene->setAmbientLight(&demo.ambient);
 
 
+	/* Projected blob shadow. Flat UNLIT disc on the floor plane
+	 * (y=-180, i.e. ball-centre-on-floor minus ball-radius). Slightly
+	 * wider than the ball's footprint so the cartoon shadow reads
+	 * as "ball pressing into the ground". Added BEFORE the ball so
+	 * the painter's pass draws the ball over it. zBias pulls the
+	 * disc forward against the floor geometry that lands in step 5
+	 * (no z-buffer in this config, so without zBias the rendered
+	 * floor would alternate above/below the shadow per the triangle
+	 * sort).
+	 */
+	demo.shadow_obj = createDisc(/*radiusX*/100, /*radiusZ*/100,
+	                             /*segments*/24, &demo.shadow);
+	demo.shadow_obj->setPosition(0, -180, 280);
+	/* No zBias yet -- the floor isn't rendered, and a positive bias
+	 * pulls the disc toward the camera so painter's sort draws it
+	 * after the ball, occluding it when they overlap. Once the
+	 * step-5 floor grid lands and we need the shadow to win the
+	 * z-fight against the floor's quads, bring back a small +bias
+	 * (and re-verify the ball still draws on top).
+	 *
+	 * The disc vertices wind CCW around a +Y normal but the camera
+	 * looks DOWN at the floor, so backface culling rejects every
+	 * triangle. NO_CULLING is one line and the disc is too small
+	 * to matter for raster cost.
+	 */
+	demo.shadow_obj->cullingMode = CullingMode::NO_CULLING;
+	demo.scene->addObject(demo.shadow_obj);
+
 	/* PHONG-lit checker sphere. Per-vertex outward normals interpolate
 	 * smoothly across the curvature so the diffuse N.L gradient
 	 * sweeps the checker as the ball spins.
@@ -479,6 +507,19 @@ int main(void)
 	 * whichever buffer the DMA is NOT currently reading from.
 	 */
 	build_scene(demo, backbuf[0], width, height);
+
+	/* Pristine copy of the shadow disc's object-local vertex positions.
+	 * Each frame the disc is rescaled in XZ from this pristine state
+	 * so the shadow's WORLD radius (not just screen-projected size)
+	 * grows when the ball is high. UNLIT mesh; the ball-ghost
+	 * artifact tracked in `feedback_jet_no_per_frame_vertex_mutation`
+	 * was a PHONG ball symptom -- empirically retesting here.
+	 */
+	std::vector<Vector3> shadowRestPos;
+	shadowRestPos.reserve(demo.shadow_obj->vertices.size());
+	for (const auto &v : demo.shadow_obj->vertices) {
+		shadowRestPos.push_back(v.position);
+	}
 
 	/* Display descriptor reused every frame -- the backbuffer's pitch
 	 * equals its width.
@@ -582,6 +623,55 @@ int main(void)
 
 		demo.ball->setRotation(0, (int32_t)spinDeg, 23);
 		demo.ball->setPosition((int32_t)posX, (int32_t)posY, (int32_t)posZ);
+
+		/* Shadow tracks the ball's XZ at the floor surface and fades
+		 * via material colour (not alpha) so the SCREEN_DOOR_ALPHA
+		 * dither doesn't show as a cross-hatch pattern. RGB565
+		 * channel lerp from kShadow (dark, ball on floor) toward
+		 * a mid-grey close to kBackcolor (light, ball at apex).
+		 * Floor-contact ball centre is y=-40, apex is ~+160; clamp
+		 * normalised height into [0, 1] before the lerp. Diameter
+		 * stays fixed at the build-time radius -- size scaling
+		 * needs an upstream Jet PR (see
+		 * `feedback_jet_no_per_frame_vertex_mutation`).
+		 */
+		demo.shadow_obj->setPosition((int32_t)posX, -180, (int32_t)posZ);
+		{
+			const float heightAboveFloor = posY - (-40.0f);
+			float normH = heightAboveFloor * (1.0f / 200.0f);
+			if (normH < 0.0f) normH = 0.0f;
+			if (normH > 1.0f) normH = 1.0f;
+
+			/* Lerp from kShadow (8, 12, 8) toward (18, 35, 18)
+			 * -- somewhat lighter but still visibly darker than
+			 * kBackcolor (24, 50, 24), so the shadow always reads
+			 * as a darker patch on the floor even at apex.
+			 */
+			const int r0 = 8,  g0 = 12, b0 = 8;
+			const int r1 = 18, g1 = 35, b1 = 18;
+			const int r = r0 + (int)((r1 - r0) * normH);
+			const int g = g0 + (int)((g1 - g0) * normH);
+			const int b = b0 + (int)((b1 - b0) * normH);
+			demo.shadow.color = (uint16_t)((r << 11) | (g << 5) | b);
+
+			/* World-radius scaling. Floor-contact: factor 1.0
+			 * (ball-sized shadow under the ball). Apex: factor
+			 * 1.7 (visibly wider, the "ball is high above ground"
+			 * cue). Linear ramp from the pristine disc geometry.
+			 * Y stays at 0 in object-local space (the disc is on
+			 * the floor plane via Object::position).
+			 */
+			const float scale = 1.0f + normH * 0.7f;
+			const int32_t scaleFp = (int32_t)(scale * (float)FIXED_POINT_SCALE);
+			const size_t n = shadowRestPos.size();
+			for (size_t i = 0; i < n; ++i) {
+				const Vector3 &p0 = shadowRestPos[i];
+				Vector3 &p = demo.shadow_obj->vertices[i].position;
+				p.x = (int32_t)((int64_t)p0.x * scaleFp / FIXED_POINT_SCALE);
+				p.y = p0.y;
+				p.z = (int32_t)((int64_t)p0.z * scaleFp / FIXED_POINT_SCALE);
+			}
+		}
 
 		/* Point the rasteriser at the buffer the previous frame's
 		 * DMA is NOT touching. The async write of the prior frame
