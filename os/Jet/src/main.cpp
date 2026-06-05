@@ -359,43 +359,11 @@ void build_scene(DemoScene &demo, uint16_t *fb, int w, int h)
 	demo.scene->setDirectionalLight(&demo.sun);
 	demo.scene->setAmbientLight(&demo.ambient);
 
-	/* Order matters because Z_BUFFERING is off and SORT_TRIANGLES
-	 * is on: paint the floor first, then the shadow disc just
-	 * above it, then the ball on top.
+	/* Stripped down: just the ball. Grid floor, back wall and shadow
+	 * disc removed -- they weren't earning their triangle budget for
+	 * what they added visually. Easy to bring back via git when we
+	 * want a fuller scene to stress more geometry.
 	 */
-	/* Floor: horizontal grid in XZ plane. Depth truncated so the far
-	 * edge lands exactly on the back wall's z (1200); without this
-	 * the floor's far cells get painted on top of the wall's lower
-	 * row (Z_BUFFERING is off; painter's algorithm by triangle Z).
-	 */
-	demo.floor = createGridFloor(/*width*/2400, /*depth*/1600,
-	                             /*cellsX*/12, /*cellsZ*/8,
-	                             /*thickness*/3, &demo.magenta);
-	demo.floor->setPosition(0, -180, 400);   /* far edge at z=1200 */
-	demo.floor->cullingMode = CullingMode::NO_CULLING;
-	demo.scene->addObject(demo.floor);
-
-	/* Back wall: same grid helper, rotated 90° around X so it
-	 * stands up. Local "depth" axis becomes vertical -- 3 rows of
-	 * 200-unit cells = 600 wall height, which fits the frustum
-	 * cleanly with FOV 70. Sat 20 units behind the floor's far edge
-	 * (z=1200 -> wall at z=1220) so coplanar painter's-algo order
-	 * doesn't paint the floor's last gridline over the wall base.
-	 */
-	demo.backwall = createGridFloor(/*width*/2400, /*depth*/600,
-	                                /*cellsX*/12, /*cellsZ*/3,
-	                                /*thickness*/3, &demo.magenta);
-	demo.backwall->setRotation(90, 0, 0);
-	/* Bottom of wall flush with floor (y=-180): center = -180+300 = 120. */
-	demo.backwall->setPosition(0, 120, 1220);
-	demo.backwall->cullingMode = CullingMode::NO_CULLING;
-	demo.scene->addObject(demo.backwall);
-
-	demo.shadow_obj = createDisc(/*rx*/180, /*rz*/55, /*segs*/32, &demo.shadow);
-	demo.shadow_obj->setPosition(0, -178, 280);  /* 2 above floor */
-	demo.shadow_obj->cullingMode = CullingMode::NO_CULLING;
-	demo.scene->addObject(demo.shadow_obj);
-
 	demo.ball = createCheckeredSphere(/*radius*/140, /*lats*/8, /*lons*/16,
 	                                  &demo.red, &demo.white);
 	demo.ball->setPosition(0, 0, 280);
@@ -528,19 +496,13 @@ int main(void)
 		/* Spin around Y on top of the static 23° Z tilt. */
 		demo.ball->rotate(0, 3, 0);
 
-		/* Boing arc: |sin| half-sine. Floor sits at y=-180 and
-		 * ball radius is 140, so y=-40 plants the ball exactly
-		 * on the grid. Peak rises ~180 above that.
+		/* Boing arc: |sin| half-sine. Same bounce as before, just
+		 * floating in empty space now that the floor / shadow are
+		 * gone -- the arc center sits at y=-40 (where the ball
+		 * previously rested on the grid).
 		 */
 		const float bounce = std::fabs(std::sin(t * 2.3f)) * 200.0f;
 		demo.ball->setPosition(0, (int32_t)(-40.0f + bounce), 280);
-
-		/* Squash the shadow horizontally as the ball rises. */
-		const float h_factor = 1.0f - 0.55f * (bounce / 200.0f);
-		demo.shadow_obj->scale = {(int32_t)(FIXED_POINT_SCALE * h_factor),
-		                          FIXED_POINT_SCALE,
-		                          (int32_t)(FIXED_POINT_SCALE * h_factor)};
-		demo.shadow_obj->transformScale = true;
 
 		/* Point the rasteriser at the buffer the previous frame's
 		 * DMA is NOT touching. The async write of the prior frame

@@ -39,6 +39,12 @@
 	 * the full 3.5 MiB, ~4x less bandwidth into uncached DRAM.
 	 */
 	pixel-format = <PANEL_PIXEL_FORMAT_RGB_565>;
+	/* 912 x 492 = 1.853 aspect, matches monitor 1824x984 native.
+	 * VC HVS scales 2x both dims so the full screen is used with no
+	 * pillarbox. 912 * 2 = 1824 bytes = 32-byte aligned so VC returns
+	 * pitch == row_bytes (no padding); the FB driver's contiguous-DMA
+	 * fast path takes it.
+	 */
 	render-width = <912>;
 	render-height = <492>;
 	status = "okay";

@@ -63,6 +63,12 @@
 #define depthFogNear (6144 * 8)
 
 // Full progressive frames -- HDMI scanout on the Pi is plenty.
+// HALF_WIDTH_BUFFERS tried 2026-06-05: ~2.5x rast speedup but VC's
+// HVS preserves buffer aspect ratio on scaling, so a 448x492 buffer
+// pillarboxes to ~895x984 inside the 1824x984 monitor. Reverted to
+// 912 wide for full-screen 16:9 output. To re-enable: flip this back
+// to 1, set overlay render-width to a 32-aligned half (~448), and
+// accept the pillarbox (or move to FIELD_BUFFERS=1 for half-area).
 #define HALF_WIDTH_BUFFERS 0
 #define FIELD_BUFFERS 0
 
