@@ -21,8 +21,13 @@
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/display.h>
+#include <zephyr/drivers/display/bcm2835_fb.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/printk.h>
+
+extern "C" {
+#include <rpi_fw.h>
+}
 
 #if IS_ENABLED(CONFIG_USB_DEVICE_STACK_NEXT)
 #include <zephyr/usb/usbd.h>
@@ -80,6 +85,81 @@ static int jet_usb_start(void)
 #else
 static inline int jet_usb_start(void) { return 0; }
 #endif
+
+/* ----------------------------------------------------------------- *
+ *  VC clock probe -- ARM and CORE rates, current vs max
+ * ----------------------------------------------------------------- */
+
+/* VideoCore clock IDs for RPI_FW_TAG_GET_*_CLOCK_RATE. Same numbering
+ * as Linux drivers/firmware/raspberrypi.c.
+ */
+#define VC_CLOCK_ID_CORE 4U
+#define VC_CLOCK_ID_ARM  3U
+
+static void jet_report_clock(const struct device *fw, const char *name,
+                             uint32_t clock_id)
+{
+	uint32_t cur[2] = {clock_id, 0U};
+	uint32_t max[2] = {clock_id, 0U};
+
+	int e1 = rpi_fw_transfer(fw, RPI_FW_TAG_GET_CLOCK_RATE, cur, sizeof(cur));
+	int e2 = rpi_fw_transfer(fw, RPI_FW_TAG_GET_MAX_CLOCK_RATE, max, sizeof(max));
+
+	if (e1 != 0 || e2 != 0) {
+		printk("[jet] clock %s: query failed (%d/%d)\r\n", name, e1, e2);
+		return;
+	}
+	printk("[jet] clock %s: cur=%u Hz max=%u Hz\r\n", name, cur[1], max[1]);
+}
+
+/* Pin a clock to a specific rate via SET_CLOCK_RATE. The third u32 is
+ * `skip_setting_turbo`: 0 lets VC raise turbo (i.e. lift the power-cap
+ * and bump core voltage if needed) so a rate above the idle floor
+ * sticks instead of being throttled back. Returns the achieved rate VC
+ * actually committed to -- if voltage / thermal headroom is short, VC
+ * may grant less than asked.
+ */
+static int jet_set_clock_rate(const struct device *fw, uint32_t clock_id,
+                              uint32_t rate_hz)
+{
+	uint32_t req[3] = {clock_id, rate_hz, 0U /* skip_setting_turbo */};
+	int err = rpi_fw_transfer(fw, RPI_FW_TAG_SET_CLOCK_RATE, req, sizeof(req));
+
+	if (err != 0) {
+		return err;
+	}
+	/* Response is [clock_id, achieved_rate]. */
+	return (int)req[1];
+}
+
+static void jet_probe_clocks(void)
+{
+	const struct device *fw = DEVICE_DT_GET_ONE(raspberrypi_bcm283x_firmware);
+
+	if (!device_is_ready(fw)) {
+		printk("[jet] VC firmware not ready -- skipping clock probe\r\n");
+		return;
+	}
+	jet_report_clock(fw, "ARM",  VC_CLOCK_ID_ARM);
+	jet_report_clock(fw, "CORE", VC_CLOCK_ID_CORE);
+
+	/* Bump ARM to its rated 1.0 GHz. VC idles the A53 to arm_freq_min
+	 * (~600 MHz) under nominal load and our render loop's k_yield-once
+	 * pattern apparently doesn't trip its busy heuristic. A direct
+	 * SET_CLOCK_RATE with skip_setting_turbo=0 forces the bump and
+	 * lifts the turbo gate so the rate persists. If VC grants less
+	 * than asked (under-voltage / thermal), the re-report will show
+	 * the actual rate.
+	 */
+	int achieved = jet_set_clock_rate(fw, VC_CLOCK_ID_ARM, 1000000000U);
+
+	if (achieved < 0) {
+		printk("[jet] ARM SET_CLOCK_RATE failed: %d\r\n", achieved);
+	} else {
+		printk("[jet] ARM SET_CLOCK_RATE -> %d Hz\r\n", achieved);
+		jet_report_clock(fw, "ARM (post-set)", VC_CLOCK_ID_ARM);
+	}
+}
 
 /* ----------------------------------------------------------------- *
  *  Demo scene
@@ -339,6 +419,13 @@ int main(void)
 	/* Bring up USB CDC (shell endpoint) -- no-op without USB. */
 	(void)jet_usb_start();
 
+	/* Single-shot at boot: ARM + CORE current vs max clock rates.
+	 * VC idles the A53 down to its arm_freq_min (~600 MHz on Zero 2 W);
+	 * if max > cur the chip can take a SET_CLOCK_RATE bump and Jet
+	 * would scale linearly with frequency.
+	 */
+	jet_probe_clocks();
+
 	const struct device *display = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
 
 	if (!device_is_ready(display)) {
@@ -368,11 +455,21 @@ int main(void)
 	 * sweeps a neighbour, and >= 16-byte so the 128-bit-wide AXI
 	 * reads the fb-blit DMA performs land on aligned addresses
 	 * (misaligned 128-bit reads wedge the channel with an AXI error).
+	 *
+	 * Two buffers: one is being rendered into by the CPU while the
+	 * other is being DMA-blitted to the VC scanout. Swapping which
+	 * is which after each frame turns the prior render+blit serial
+	 * sequence into render N+1 || blit N, dropping frame time to
+	 * max(render, blit). Costs 2x the backbuffer footprint (~1.75
+	 * MiB total at 912x492 RGB565).
 	 */
-	uint16_t *backbuf = static_cast<uint16_t *>(k_aligned_alloc(64, fb_bytes));
+	uint16_t *backbuf[2] = {
+		static_cast<uint16_t *>(k_aligned_alloc(64, fb_bytes)),
+		static_cast<uint16_t *>(k_aligned_alloc(64, fb_bytes)),
+	};
 
-	if (backbuf == nullptr) {
-		printk("[jet] no heap for backbuffer (need %zu bytes; "
+	if (backbuf[0] == nullptr || backbuf[1] == nullptr) {
+		printk("[jet] no heap for double backbuffer (need 2 x %zu bytes; "
 		       "raise CONFIG_HEAP_MEM_POOL_SIZE)\r\n",
 		       fb_bytes);
 		return -ENOMEM;
@@ -380,7 +477,12 @@ int main(void)
 
 	DemoScene demo;
 
-	build_scene(demo, backbuf, width, height);
+	/* Scene is bound to backbuf[0] for the first frame; we swap to
+	 * backbuf[1] via setFramebuffer() at the start of frame 2 (and
+	 * back again every frame after) so the rasteriser writes into
+	 * whichever buffer the DMA is NOT currently reading from.
+	 */
+	build_scene(demo, backbuf[0], width, height);
 
 	/* Display descriptor reused every frame -- the backbuffer's pitch
 	 * equals its width.
@@ -396,9 +498,30 @@ int main(void)
 	int64_t fps_window_start = k_uptime_get();
 	uint32_t frames_in_window = 0;
 
+	/* Per-window cycle accumulators for each measured phase. Reset
+	 * every time the FPS line prints. We split scene->render() into
+	 * its two upstream-exposed sub-phases (prepareFrame = cull/
+	 * transform/sort, rasterizeBand = the per-triangle rasteriser
+	 * pass), then time the blit kick-off separately. With double-
+	 * buffered async DMA the blit time measured here is just the
+	 * tail-wait + kick-off cost -- the bulk of the DMA wall-clock
+	 * runs in parallel with the next frame's prepareFrame/rasterize.
+	 */
+	uint64_t cyc_prep = 0, cyc_rast = 0, cyc_blit = 0;
+
+	const uint64_t cycles_per_sec = sys_clock_hw_cycles_per_sec();
+
 	const int64_t t0_ms = k_uptime_get();
 
-	printk("[jet] entering render loop\r\n");
+	/* cur = which backbuffer the CPU is currently rendering into;
+	 * the OTHER one is being DMA'd to the VC framebuffer (or has
+	 * just finished, depending on timing). After each frame's
+	 * blit kick-off we flip cur so the next frame's prepareFrame/
+	 * rasterizeBand writes into the freshly-freed buffer.
+	 */
+	unsigned int cur = 0;
+
+	printk("[jet] entering render loop (double-buffered async DMA)\r\n");
 	for (;;) {
 		const float t = (k_uptime_get() - t0_ms) * 0.001f;
 
@@ -419,14 +542,47 @@ int main(void)
 		                          (int32_t)(FIXED_POINT_SCALE * h_factor)};
 		demo.shadow_obj->transformScale = true;
 
-		demo.scene->render();
-		int rc = display_write(display, 0, 0, &desc, backbuf);
+		/* Point the rasteriser at the buffer the previous frame's
+		 * DMA is NOT touching. The async write of the prior frame
+		 * is reading backbuf[cur ^ 1]; we write into backbuf[cur].
+		 */
+		demo.scene->setFramebuffer(backbuf[cur]);
+
+		/* Phase split: prepareFrame() does the cull / transform /
+		 * triangle-sort pass and rasterizeBand(0, h) walks the
+		 * resulting sorted queue. Together they produce exactly the
+		 * same framebuffer as scene->render() (which is itself just
+		 * prepareFrame + rasterizeBand(0, screenHeight) + post-FX,
+		 * none of which are enabled in our JetConfig). Splitting
+		 * lets us see which half of the render budget is the
+		 * rasteriser and which is everything before it.
+		 */
+		const uint32_t c0 = k_cycle_get_32();
+		demo.scene->prepareFrame();
+		const uint32_t c1 = k_cycle_get_32();
+		demo.scene->rasterizeBand(0, height);
+		const uint32_t c2 = k_cycle_get_32();
+		/* Async kick: if the previous DMA hasn't completed yet,
+		 * this blocks for the remaining tail. Otherwise it just
+		 * configures + starts the new DMA and returns. Frame time
+		 * becomes max(render, blit) instead of render + blit.
+		 */
+		int rc = bcm2835_fb_write_async(display, &desc, backbuf[cur]);
+		const uint32_t c3 = k_cycle_get_32();
 
 		if (rc < 0) {
-			printk("[jet] display_write failed: %d (stopping)\r\n", rc);
+			printk("[jet] write_async failed: %d (stopping)\r\n", rc);
 			break;
 		}
 
+		cur ^= 1U;
+
+		/* k_cycle_get_32 is a free-running counter; modular subtract
+		 * yields the elapsed cycles regardless of wraparound.
+		 */
+		cyc_prep += (uint32_t)(c1 - c0);
+		cyc_rast += (uint32_t)(c2 - c1);
+		cyc_blit += (uint32_t)(c3 - c2);
 		frames_in_window++;
 
 		const int64_t now = k_uptime_get();
@@ -435,20 +591,35 @@ int main(void)
 		if (elapsed_ms >= 1000) {
 			const uint32_t fps_x10 =
 				(uint32_t)((int64_t)frames_in_window * 10000 / elapsed_ms);
+			/* Cycles -> microseconds via the kernel's hw-cycle
+			 * frequency. Divide before accumulating per frame
+			 * would lose precision; do it at the print site.
+			 */
+			const uint32_t us_prep =
+				(uint32_t)((cyc_prep * 1000000U) /
+				           (cycles_per_sec * frames_in_window));
+			const uint32_t us_rast =
+				(uint32_t)((cyc_rast * 1000000U) /
+				           (cycles_per_sec * frames_in_window));
+			const uint32_t us_blit =
+				(uint32_t)((cyc_blit * 1000000U) /
+				           (cycles_per_sec * frames_in_window));
 
 			/* printk (synchronous, direct to console) rather than
 			 * LOG_INF -- the deferred log thread is at low
 			 * priority and a tight render loop on a priority-0
 			 * main never gives it a slot.
 			 */
-			printk("[jet] %u.%u fps  (%d objs, %d tris drawn, "
-			       "%d rasterized)\r\n",
+			printk("[jet] %u.%u fps  prep=%u us  rast=%u us  "
+			       "blit=%u us  (%d objs, %d tris, %d rast)\r\n",
 			       fps_x10 / 10U, fps_x10 % 10U,
+			       us_prep, us_rast, us_blit,
 			       demo.scene->lastFrameDrawnObjects,
 			       demo.scene->lastFrameDrawnTriangles,
 			       demo.scene->lastFrameRasterizedTriangles);
 			fps_window_start = now;
 			frames_in_window = 0;
+			cyc_prep = cyc_rast = cyc_blit = 0;
 		}
 
 		/* Yield once per frame so lower-priority threads (log
