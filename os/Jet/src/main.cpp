@@ -179,6 +179,12 @@ constexpr uint16_t kWhite       = RGB565(31, 63, 31);  /* pure white       */
 constexpr uint16_t kMagenta     = RGB565(31,  0, 25);  /* Amiga magenta    */
 constexpr uint16_t kShadow      = RGB565( 8, 12,  8);  /* dark grey disc   */
 
+/* Ball Y-spin rate in degrees per second. Time-based (not per-frame)
+ * so the visible spin speed stays constant across fps swings -- the
+ * old rotate(0, 3, 0) per frame at 240 fps was 720 dps.
+ */
+constexpr float kBallSpinDPS = 90.0f;
+
 /* Build a per-face red/white checkered sphere. Materials are UNLIT
  * so the colours render exactly as authored -- this matches the
  * Amiga original, which used flat colour-cycled palette entries
@@ -308,14 +314,34 @@ Object *createDisc(int32_t radiusX, int32_t radiusZ, int segments, Material *mat
 struct DemoScene {
 	Scene *scene = nullptr;
 	Camera camera{};
-	/* Lighting is set up but the Boing materials are UNLIT, so the
-	 * sun / ambient affect only the floor and shadow disc.
+	/* Light from upper-front-right (azimuth=300°, elevation=40°). At
+	 * camera position the +Y world axis is "up", -Z is "toward camera".
+	 * Azimuth 300° puts the light source on the camera side; elev 40°
+	 * gives a noticeable diagonal gradient across the visible
+	 * hemisphere of the ball.
 	 */
-	DirectionalLight sun{Vector3{50, 40, 0}, Color{255, 240, 210}, 200};
-	AmbientLight     ambient{Color{60, 70, 90}};
+	/* Sun: warm key from upper-front-right (azimuth=300°, elev=40°).
+	 * Ambient: cool blue uniform fill. Jet supports only one
+	 * DirectionalLight, so a real "fill from bottom-left" would need
+	 * a Jet patch (Scene + Renderer.cpp + jetShadeBrightness to sum
+	 * two Lambert contributions). For now the cool ambient at least
+	 * lifts the shadow hemisphere from black to a dim sky-tinted
+	 * dim-grey -- not directional, but the warm/cool contrast
+	 * reads as "sky-fill" rather than "no light".
+	 */
+	DirectionalLight sun{Vector3{300, 40, 0}, Color{255, 245, 220}, 255};
+	AmbientLight     ambient{Color{40, 55, 90}};
 
-	Material red    {kRed};
-	Material white  {kWhite};
+	/* Ball materials: PHONG with diffuse=255 (full lit term, was 180 =
+	 * 30% attenuated) and specular=200 (widens the brightness ceiling
+	 * above 255 so the forward-facing pixels can blow out toward white
+	 * -- Jet's specular is a static N.z² brightening at the camera-
+	 * facing silhouette, not a true Blinn-Phong moving highlight).
+	 * Constructor args:
+	 *   (color, diffuseMap, shader, emissive, alpha, diffuse, specular).
+	 */
+	Material red    {kRed,   nullptr, nullptr, false, 255, 255, 200};
+	Material white  {kWhite, nullptr, nullptr, false, 255, 255, 200};
 	Material magenta{kMagenta};
 	Material shadow {kShadow};
 
@@ -327,13 +353,16 @@ struct DemoScene {
 
 void build_scene(DemoScene &demo, uint16_t *fb, int w, int h)
 {
-	/* Boing materials are flat-coloured panels -- no shading, exactly
-	 * matching the original colour-cycled palette look. The floor and
-	 * shadow ride the same UNLIT path so their colours stay pure
-	 * (and we don't have to fight Jet's per-face lighting headroom).
+	/* Ball goes PHONG so the per-pixel diffuse gradient is smooth across
+	 * the curvature -- the checker pattern visibly rotates through the
+	 * fixed world-space lit/unlit hemisphere as the ball spins.
+	 * (Jet's "specular" is a static N.z² brightening on the camera-
+	 * facing pole, NOT a moving Blinn-Phong highlight; for a real
+	 * sweeping highlight we'd need to patch Renderer.cpp's
+	 * jetShadeBrightness.)
 	 */
-	demo.red.shadingMode     = ShadingMode::UNLIT;
-	demo.white.shadingMode   = ShadingMode::UNLIT;
+	demo.red.shadingMode     = ShadingMode::PHONG;
+	demo.white.shadingMode   = ShadingMode::PHONG;
 	demo.magenta.shadingMode = ShadingMode::UNLIT;
 	demo.shadow.shadingMode  = ShadingMode::UNLIT;
 
@@ -341,36 +370,41 @@ void build_scene(DemoScene &demo, uint16_t *fb, int w, int h)
 	demo.scene->setBackcolor(kBackcolor);
 	demo.scene->setClearBuffer(true);
 
-	/* Camera tuned so:
-	 *   - the floor's shadow disc at y=-178 stays inside the
-	 *     bottom of the view frustum (was being culled at the
-	 *     previous "nearly horizontal" angle),
-	 *   - all 3 rows of the back-wall grid clear the top edge.
-	 * FOV 70 (vs 60 before) adds enough vertical headroom to fit
-	 * the wall without making the perspective too wide-angle.
+	/* Camera pulled back to z=-440 so the ball at its bounce peak
+	 * (top of ball at world y ~ 300) stays inside the frustum's
+	 * vertical extent at FOV 70. FOV preserved so the perspective
+	 * doesn't go wide-angle; only the distance changes.
 	 */
-	demo.camera.setPosition(0, 160, -340);
+	demo.camera.setPosition(0, 160, -440);
 	demo.camera.lookAt(Vector3{0, 40, 280});
 	demo.camera.setFOV(70.0f, w);
 	demo.camera.nearPlane = 32;
 	demo.camera.farPlane = 8192;
 	demo.scene->setCamera(&demo.camera);
 
+	/* Jet quirk: initializeTrigTables() is called inside Scene::Scene()
+	 * (TrigLUT.cpp populates sin_table only at that point). Our
+	 * DirectionalLight is a value member of DemoScene constructed in
+	 * main() before any Scene exists, so its constructor's
+	 * calculateLightDirection() runs against an all-zero sin_table and
+	 * caches worldLightDir = (0, 0, 0). Re-trigger now that the tables
+	 * are populated. Upstream Sample.cpp avoids this by constructing
+	 * lights AFTER Scene; our struct-with-value-members order doesn't.
+	 */
+	demo.sun.updateDirection(demo.sun.direction);
+
 	demo.scene->setDirectionalLight(&demo.sun);
 	demo.scene->setAmbientLight(&demo.ambient);
 
-	/* Stripped down: just the ball. Grid floor, back wall and shadow
-	 * disc removed -- they weren't earning their triangle budget for
-	 * what they added visually. Easy to bring back via git when we
-	 * want a fuller scene to stress more geometry.
+
+	/* PHONG-lit checker sphere. Per-vertex outward normals interpolate
+	 * smoothly across the curvature so the diffuse N.L gradient
+	 * sweeps the checker as the ball spins.
 	 */
 	demo.ball = createCheckeredSphere(/*radius*/140, /*lats*/8, /*lons*/16,
 	                                  &demo.red, &demo.white);
 	demo.ball->setPosition(0, 0, 280);
-	/* Z-tilt of 23° = the Amiga axial tilt. Spin around Y on top
-	 * of that in the render loop.
-	 */
-	demo.ball->setRotation(0, 0, 23);
+	demo.ball->setRotation(0, 0, 23);  /* Amiga axial tilt */
 	demo.scene->addObject(demo.ball);
 }
 
@@ -493,14 +527,12 @@ int main(void)
 	for (;;) {
 		const float t = (k_uptime_get() - t0_ms) * 0.001f;
 
-		/* Spin around Y on top of the static 23° Z tilt. */
-		demo.ball->rotate(0, 3, 0);
-
-		/* Boing arc: |sin| half-sine. Same bounce as before, just
-		 * floating in empty space now that the floor / shadow are
-		 * gone -- the arc center sits at y=-40 (where the ball
-		 * previously rested on the grid).
+		/* Spin around Y on top of the static 23° Z tilt. Time-based
+		 * (fps-independent) at kBallSpinDPS deg/sec.
 		 */
+		demo.ball->setRotation(0, (int32_t)(kBallSpinDPS * t), 23);
+
+		/* Boing arc: |sin| half-sine. */
 		const float bounce = std::fabs(std::sin(t * 2.3f)) * 200.0f;
 		demo.ball->setPosition(0, (int32_t)(-40.0f + bounce), 280);
 
