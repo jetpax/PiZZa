@@ -179,12 +179,6 @@ constexpr uint16_t kWhite       = RGB565(31, 63, 31);  /* pure white       */
 constexpr uint16_t kMagenta     = RGB565(31,  0, 25);  /* Amiga magenta    */
 constexpr uint16_t kShadow      = RGB565( 8, 12,  8);  /* dark grey disc   */
 
-/* Ball Y-spin rate in degrees per second. Time-based (not per-frame)
- * so the visible spin speed stays constant across fps swings -- the
- * old rotate(0, 3, 0) per frame at 240 fps was 720 dps.
- */
-constexpr float kBallSpinDPS = 90.0f;
-
 /* Build a per-face red/white checkered sphere. Materials are UNLIT
  * so the colours render exactly as authored -- this matches the
  * Amiga original, which used flat colour-cycled palette entries
@@ -513,7 +507,21 @@ int main(void)
 
 	const uint64_t cycles_per_sec = sys_clock_hw_cycles_per_sec();
 
-	const int64_t t0_ms = k_uptime_get();
+	/* Ball pose integrated each frame: gravity on Y, free X+Z drift
+	 * with wall bounces. Floor at -40, X centre limit +/-160, Z
+	 * centre limit [180, 380]. Y bounce uses energy-conserving
+	 * restitution at the floor clamp so Euler overshoot doesn't
+	 * decay the apex height. Z bounces perpetually (no wall decay);
+	 * X decays at 0.92 per wall hit so the lateral roaming gradually
+	 * concentrates the ball mid-room. Y-spin rate tracks horizontal
+	 * speed (60 dps + |vel.xz|*0.5), sign follows vx with a sticky
+	 * |vx| < 1 deadband.
+	 */
+	float posX = 0.0f,   posY = -40.0f, posZ = 280.0f;
+	float velX = 130.0f, velY = 600.0f, velZ = 75.0f;
+	float spinDeg = 0.0f;
+	int   spinSign = +1;
+	int64_t lastTickMs = k_uptime_get();
 
 	/* cur = which backbuffer the CPU is currently rendering into;
 	 * the OTHER one is being DMA'd to the VC framebuffer (or has
@@ -525,16 +533,55 @@ int main(void)
 
 	printk("[jet] entering render loop (double-buffered async DMA)\r\n");
 	for (;;) {
-		const float t = (k_uptime_get() - t0_ms) * 0.001f;
+		const int64_t nowMs = k_uptime_get();
+		float dt = (float)(nowMs - lastTickMs) * 0.001f;
+		if (dt > 0.050f) dt = 0.050f;        /* hitch clamp: 20 fps minimum */
+		lastTickMs = nowMs;
 
-		/* Spin around Y on top of the static 23° Z tilt. Time-based
-		 * (fps-independent) at kBallSpinDPS deg/sec.
+		velY -= 900.0f * dt;
+		posX += velX * dt;
+		posY += velY * dt;
+		posZ += velZ * dt;
+		if (posY <= -40.0f) {
+			/* Energy-conserving bounce. Naively flipping velY's sign
+			 * after the position clamp loses a few percent of energy
+			 * per bounce: the Euler step overshoots the floor and the
+			 * clamp throws away the gravitational PE the ball would
+			 * have gained falling from posY back up to the floor.
+			 * Recover it by computing KE at the moment of floor
+			 * contact = current KE + g*overshoot, then use the
+			 * matching velocity (post-restitution, positive going up).
+			 * Without this the apex amplitude decays exponentially
+			 * and the ball settles at the floor after ~30 seconds.
+			 */
+			const float overshoot = -40.0f - posY;
+			const float keContact = 0.5f * velY * velY + 900.0f * overshoot;
+			velY = std::sqrt(2.0f * keContact);
+			posY = -40.0f;
+		}
+		/* X walls at +/-300, ball radius 140 -> centre limit +/-160. */
+		if (posX > 160.0f)  { posX = 160.0f;  velX = -velX * 0.92f; }
+		if (posX < -160.0f) { posX = -160.0f; velX = -velX * 0.92f; }
+		/* Z room: walls placed so the ball's CENTRE has a 200-unit
+		 * range [180, 380]. Previous version was [260, 300] which
+		 * only changed apparent ball size by ~5% (barely visible)
+		 * and read as "no Z motion". 200-unit swing gives ~30%
+		 * perspective-size oscillation at the camera distance.
+		 * Restitution 1.0 -- perpetual, no decay.
 		 */
-		demo.ball->setRotation(0, (int32_t)(kBallSpinDPS * t), 23);
+		if (posZ > 380.0f) { posZ = 380.0f; velZ = -velZ; }
+		if (posZ < 180.0f) { posZ = 180.0f; velZ = -velZ; }
 
-		/* Boing arc: |sin| half-sine. */
-		const float bounce = std::fabs(std::sin(t * 2.3f)) * 200.0f;
-		demo.ball->setPosition(0, (int32_t)(-40.0f + bounce), 280);
+		const float horizSpeed = std::sqrt(velX * velX + velZ * velZ);
+		const float spinRate   = 60.0f + horizSpeed * 0.5f;
+		if (velX >  1.0f) spinSign = +1;
+		else if (velX < -1.0f) spinSign = -1;
+		spinDeg += (float)spinSign * spinRate * dt;
+		while (spinDeg >=  360.0f) spinDeg -= 360.0f;
+		while (spinDeg <= -360.0f) spinDeg += 360.0f;
+
+		demo.ball->setRotation(0, (int32_t)spinDeg, 23);
+		demo.ball->setPosition((int32_t)posX, (int32_t)posY, (int32_t)posZ);
 
 		/* Point the rasteriser at the buffer the previous frame's
 		 * DMA is NOT touching. The async write of the prior frame
