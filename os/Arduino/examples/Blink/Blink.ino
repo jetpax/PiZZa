@@ -1,18 +1,17 @@
 /*
- * Blink — toggles an LED wired to D13 (= BCM GPIO 11, header pin 23).
- * The Pi Zero 2 W has no on-board LED on the 40-pin header; wire an LED
- * + 330 ohm resistor between header pin 23 and ground (header pin 25).
+ * Blink — toggles the on-board green ACT LED via Arduino's
+ * `LED_BUILTIN` macro. On the Pi Zero 2 W variant that resolves to
+ * D14 = BCM GPIO 29, wired in the variant overlay's
+ * `builtin-led-gpios`. No external LED required.
  */
 
-const int LED = 13;
-
 void setup() {
-  pinMode(LED, OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
 }
 
 void loop() {
-  digitalWrite(LED, HIGH);
+  digitalWrite(LED_BUILTIN, HIGH);
   delay(500);
-  digitalWrite(LED, LOW);
+  digitalWrite(LED_BUILTIN, LOW);
   delay(500);
 }
