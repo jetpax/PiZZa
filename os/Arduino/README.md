@@ -18,9 +18,11 @@ Source layout
 |---|---|
 | `~/github/SS/ArduinoCore-zephyr/` (branch `pizza`) | Forked Arduino core; carries the loader + the `rpi_zero_2w_bcm2710` variant + the `pizza` `boards.txt` FQBN entry |
 | `~/github/SS/ArduinoCore-API/` | Upstream Arduino API headers (Stream, Print, etc.) — sibling clone the cores include via `../../ArduinoCore-API/` |
-| `os/Arduino/sketch/` | The Phase 3 reference sketch — a bare-C `int main()` that `printk`s a Hello string. The build target the toolchain produces |
+| `os/Arduino/sketch/` | The Phase 3 reference sketch — a bare-C `int main()` that `printk`s a Hello string. Used as the smoke test for the SD-FAT load path |
 | `os/Arduino/cxx-probe/` | Phase 1 standalone C++ recipe validator (global ctor / virtual dispatch / `__cxa_guard` / `std::array`). Kept as a regression baseline for the `CONFIG_GLIBCXX_LIBCPP + -DTOOLCHAIN_HAS_GLIBCXX=ON` recipe |
-| `build.sh` | Orchestrates both builds (loader + sketch) against the local Zephyr workspace at `~/zephyrproject/` |
+| `os/Arduino/examples/Blink/` | Standard Arduino Blink — toggles an LED on D13. Phase 5 reference sketch |
+| `os/Arduino/examples/HelloSerial/` | Echo-on-Serial — prints once, echoes any byte received. Phase 5 reference sketch |
+| `build.sh` | Orchestrates both builds (loader + Phase 3 sketch) against the local Zephyr workspace at `~/zephyrproject/`. Phase 4+ `.ino` sketches build via `arduino-cli` instead |
 
 ## Build + flash (current Phase 3 flow)
 
@@ -120,11 +122,77 @@ targets, so PiZZA lives as a local variant only.
   HAL is fetched via west update — not in the default allowlist; passed
   on the build line via `EXTRA_ZEPHYR_MODULES`).
 
+## Building a sketch (the IDE / CLI path — Phase 4+)
+
+Once arduino-cli is set up with the symlinks in
+[Local-dev wiring](#local-dev-wiring-phase-4), a stock Arduino sketch
+builds via the usual one-liner:
+
+```sh
+arduino-cli compile -b arduino-git:zephyr:pizza --output-dir /tmp/out \
+    os/Arduino/examples/Blink
+```
+
+`compile` produces `/tmp/out/Blink.ino.elf` — an AArch64 relocatable ELF
+that IS the `.llext` (we override `pizza.upload.extension=elf` and skip
+the upstream `zephyr-sketch-tool` header-wrap step). Deploy with:
+
+```sh
+arduino-cli upload --input-dir /tmp/out -b arduino-git:zephyr:pizza
+```
+
+which runs our `tools.sdfat` upload pattern — `cp ... && diskutil eject`
+on macOS, `cp ... && sync && umount ...` on Linux. The SD mount point
+defaults to `/Volumes/RECOVERY` (PINN), overridable per-OS in `boards.txt`.
+
+## Local-dev wiring (Phase 4)
+
+Until the platform ships through Arduino's package index, the dev
+workflow needs three symlinks:
+
+```sh
+mkdir -p ~/Library/Arduino15/packages/arduino-git/hardware/zephyr
+ln -sfn ~/github/SS/ArduinoCore-zephyr \
+        ~/Library/Arduino15/packages/arduino-git/hardware/zephyr/9.9.9
+
+mkdir -p ~/Library/Arduino15/packages/arduino-git/tools/aarch64-zephyr-elf
+ln -sfn ~/zephyr-sdk/aarch64-zephyr-elf \
+        ~/Library/Arduino15/packages/arduino-git/tools/aarch64-zephyr-elf/0.17.0
+
+mkdir -p ~/github/SS/modules/lib
+ln -sfn ~/github/SS/ArduinoCore-API \
+        ~/github/SS/modules/lib/ArduinoCore-API
+```
+
+(The third one is so the in-tree
+`cores/arduino/api -> ../../../modules/lib/ArduinoCore-API/api/`
+symlink — which assumes a west workspace at `~/github/SS/` — resolves.)
+
+After that, `arduino-cli board search pizza` will list
+`arduino-git:zephyr:pizza`.
+
 ## Status
 
-Phase 0 (llext gating spike) — DONE hw-GREEN 2026-06-06.
-Phase 1 (C++ runtime) — DONE hw-GREEN 2026-06-06.
-Phase 2 (variant + board wiring) — DONE files-only 2026-06-06.
-Phase 3 (loader fork for SD-FAT) — DONE hw-GREEN 2026-06-06.
+| Phase | What | Status |
+|---|---|---|
+| 0 | llext gating spike on aarch64 (`samples/subsys/llext/modules`) | DONE hw-GREEN |
+| 1 | C++ runtime: `CONFIG_GLIBCXX_LIBCPP` + `-DTOOLCHAIN_HAS_GLIBCXX=ON` | DONE hw-GREEN |
+| 2 | Variant `.overlay` + `.conf` + `boards.txt` FQBN entry | DONE files-only |
+| 3 | Loader fork — SD-FAT path via `fs_loader`, `printk`-only sketch runs end-to-end | DONE hw-GREEN |
+| 4 | `arduino-cli` build recipe + `tools.sdfat` upload tool | DONE — compile end-to-end via arduino-cli |
+| 5 | Real Arduino sketches (Blink, HelloSerial) compile cleanly via arduino-cli | DONE compile-side; **runtime blocked by an SDHost driver bug, not by this port** |
 
-Detail journal lives in `~/github/SS/notes/pizza-arduino-phase{0,1,2,3}.md`.
+### Phase 5 — the open driver issue (orthogonal)
+
+Any sketch whose `fs_read` for section headers crosses the first 512-byte
+SD block hangs the BCM2835 SDHost polled-PIO driver
+(`drivers/sdhc/sdhc_bcm2835_sdhost.c` on the `pizero` branch of the
+user's Zephyr workspace) with `CMD13: NEW_FLAG never cleared`. Phase 3's
+1.5 KB sketch happened to fit in the first read; Phase 5's 6.9 KB Blink
+and 14 KB HelloSerial both expose the bug. This is broader-port driver
+work — flagged as a spinoff task; tracked in [`pizero` branch's HANDOVER.md].
+
+Once that driver issue lands, Arduino sketches built via `arduino-cli`
+should run unchanged.
+
+Detail journal lives in `~/github/SS/notes/pizza-arduino-phase{0,1,2,3,4,5}.md`.
