@@ -74,14 +74,25 @@ set(WIPEOUT_COMMON_SRC
   ${WIPEOUT_SRC_DIR}/wipeout/sfx.c
 )
 
-# Port sources. render_software_smp.c is the upstream renderer with
-# the band edit applied + gfx_parallel_run wiring; gfx_parallel_zephyr.c
-# is the persistent worker pool (band 0 on caller); platform_zephyr.c
-# is the platform.h backend + the Zephyr main thread that drives the
-# game loop; wipeout_glue.c wraps the engine's file_* helpers onto
-# Zephyr fs_* + /SD: prefix.
+# Port sources. The rasteriser file is picked by Kconfig:
+#   CONFIG_WIPEOUT_RENDERER_SMP (default) -> render_software_smp.c,
+#     the upstream renderer with the band edit applied + gfx_parallel_run
+#     wiring.
+#   CONFIG_WIPEOUT_RENDERER_PIZZA -> render_software_pizza.c, the
+#     Q16/RGB565 rewrite (scaffolding only; see
+#     notes/wipeout_pizza_renderer_spec.md).
+# gfx_parallel_zephyr.c is the persistent worker pool (band 0 on
+# caller); platform_zephyr.c is the platform.h backend + the Zephyr
+# main thread that drives the game loop; wipeout_glue.c wraps the
+# engine's file_* helpers onto Zephyr fs_* + /SD: prefix.
+if(CONFIG_WIPEOUT_RENDERER_PIZZA)
+  set(WIPEOUT_RENDERER_SRC src/render_software_pizza.c)
+else()
+  set(WIPEOUT_RENDERER_SRC src/render_software_smp.c)
+endif()
+
 set(WIPEOUT_PORT_SRC
-  src/render_software_smp.c
+  ${WIPEOUT_RENDERER_SRC}
   src/gfx_parallel_zephyr.c
   src/platform_zephyr.c
   src/wipeout_glue.c

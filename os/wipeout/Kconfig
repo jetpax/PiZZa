@@ -6,4 +6,38 @@
 
 source "samples/subsys/usb/common/Kconfig.sample_usbd"
 
+# Which port-side rasteriser to compile. The SMP renderer is the
+# shipping renderer; the PiZZa renderer is the in-development
+# Q16-RGB565 rewrite per notes/wipeout_pizza_renderer_spec.md.
+# Today's builds keep the SMP default; flipping the gate swaps in
+# the new file.
+choice
+	prompt "Wipeout software renderer backend"
+	default WIPEOUT_RENDERER_SMP
+	help
+	  Selects which renderer source file the wipeout port compiles.
+	  Both files implement the same render.h API; only one is
+	  linked into a given build.
+
+config WIPEOUT_RENDERER_SMP
+	bool "Float ARGB_8888 SMP renderer (shipping)"
+	help
+	  render_software_smp.c -- the upstream phoboslab renderer plus
+	  the PiZZa SMP band edits. Shipping configuration. ARGB_8888
+	  framebuffer, float-per-pixel inner loop, scanline rasteriser.
+
+config WIPEOUT_RENDERER_PIZZA
+	bool "Q16 RGB565 PiZZa renderer (in development)"
+	help
+	  render_software_pizza.c -- Q16 fixed-point inner loop, RGB565
+	  framebuffer, split RGBA5551 + RGBA4444 atlases, edge-function
+	  rasteriser with five specialised fast paths. Targets ~3-5x
+	  speedup over the SMP renderer on rpi_zero_2w.
+
+	  Currently scaffolding only; enabling this option builds and
+	  links but renders a black screen. See
+	  notes/wipeout_pizza_renderer_spec.md for the phased plan.
+
+endchoice
+
 source "Kconfig.zephyr"
