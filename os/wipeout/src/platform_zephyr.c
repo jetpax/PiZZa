@@ -291,13 +291,17 @@ static volatile int pizza_capture_requested;
 
 extern int pizza_capture_frame(const rgba_t *buf, int w, int h);
 
+extern void pizza_sd_diag(void);
+
 static void pizza_game_loop(void *p1, void *p2, void *p3)
 {
 	ARG_UNUSED(p1);
 	ARG_UNUSED(p2);
 	ARG_UNUSED(p3);
 
-	printk("[wipeout] game thread up; calling system_init\n");
+	printk("[wipeout] game thread up; SD diagnostic:\n");
+	pizza_sd_diag();
+	printk("[wipeout] calling system_init\n");
 	system_init();
 	printk("[wipeout] system_init OK; entering render loop\n");
 

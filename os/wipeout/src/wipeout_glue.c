@@ -46,6 +46,86 @@ PARTITION VolToPart[FF_VOLUMES] = {
 #define DATA_MOUNT_POINT "/DATA:"
 #define ASSET_PREFIX     DATA_MOUNT_POINT
 
+/* Boot-time SD diagnostic: list /SD:/ contents (depth 1) so a missing
+ * wipeout/ asset tree shows up explicitly in the boot log instead of
+ * as the engine's generic "content missing" die(). Called from
+ * platform_zephyr.c before system_init().
+ */
+static void diag_one(const char *mp, int list_entries)
+{
+	struct fs_statvfs st;
+	int rc = fs_statvfs(mp, &st);
+
+	if (rc < 0) {
+		printk("[wipeout] %s: fs_statvfs -> %d (not mounted?)\n", mp, rc);
+		return;
+	}
+	uint64_t total = (uint64_t)st.f_bsize * (uint64_t)st.f_blocks;
+	uint64_t freeb = (uint64_t)st.f_bsize * (uint64_t)st.f_bfree;
+
+	printk("[wipeout] %s: mounted, %llu MiB total, %llu MiB free\n",
+	       mp,
+	       (unsigned long long)(total >> 20),
+	       (unsigned long long)(freeb >> 20));
+
+	if (!list_entries) {
+		return;
+	}
+
+	struct fs_dir_t d;
+
+	fs_dir_t_init(&d);
+	rc = fs_opendir(&d, mp);
+	if (rc < 0) {
+		printk("[wipeout] %s: fs_opendir -> %d\n", mp, rc);
+		return;
+	}
+	int n = 0;
+
+	for (;;) {
+		struct fs_dirent ent;
+
+		rc = fs_readdir(&d, &ent);
+		if (rc < 0 || ent.name[0] == '\0') {
+			break;
+		}
+		printk("[wipeout] %s: %c %s (%u B)\n", mp,
+		       ent.type == FS_DIR_ENTRY_DIR ? 'd' : 'f',
+		       ent.name, (unsigned)ent.size);
+		n++;
+		if (n >= 16) {
+			printk("[wipeout] %s: ... (more entries)\n", mp);
+			break;
+		}
+	}
+	fs_closedir(&d);
+}
+
+void pizza_sd_diag(void)
+{
+	/* Quick mount-status line for /SD: (RECOVERY) -- don't dump
+	 * the listing; it's the same Pi boot stuff every time. The
+	 * /DATA: assets partition gets the full listing + probes so
+	 * a missing wipeout/ tree is obvious in the boot log.
+	 */
+	diag_one(SD_MOUNT_POINT, 0);
+	diag_one(DATA_MOUNT_POINT, 1);
+
+	struct fs_dirent e;
+	const char *probes[] = {
+		"/DATA:/wipeout",
+		"/DATA:/wipeout/track01",
+		"/DATA:/wipeout/textures",
+		"/DATA:/wipeout/common",
+	};
+	for (size_t i = 0; i < sizeof(probes) / sizeof(probes[0]); i++) {
+		int s = fs_stat(probes[i], &e);
+		printk("[wipeout] stat(%s) -> %d %s\n",
+		       probes[i], s,
+		       s == 0 ? (e.type == FS_DIR_ENTRY_DIR ? "[dir]" : "[file]") : "");
+	}
+}
+
 static void pizza_resolve(char *out, size_t out_sz, const char *path)
 {
 	if (path[0] == '/') {
@@ -149,6 +229,52 @@ uint8_t *__wrap_file_load(const char *path, uint32_t *bytes_read)
 	return bytes;
 }
 
+/* fs_open with FS_O_CREATE only creates the file, not its parent
+ * directory. FATFS returns -ENOENT (-2) when the parent dir is
+ * missing -- which is what the engine's first `save.dat` write trips
+ * on /DATA:/userdata/. Walk the path, mkdir each component, ignore
+ * "already exists" (-EEXIST = -17). Skip the leading mount-point
+ * (e.g. "/DATA:") so we don't try to mkdir a mount root.
+ */
+static void pizza_mkdir_parents(const char *path)
+{
+	char buf[256];
+
+	strncpy(buf, path, sizeof(buf) - 1);
+	buf[sizeof(buf) - 1] = '\0';
+	char *p = strrchr(buf, '/');
+
+	if (p == NULL || p == buf) {
+		return;
+	}
+	*p = '\0';
+	/* Walk forward from after the mount-point colon, mkdir-ing
+	 * each subdir.
+	 */
+	char *start = strchr(buf, ':');
+
+	start = start ? start + 1 : buf;
+	if (*start == '/') {
+		start++;
+	}
+	for (char *s = start; *s; s++) {
+		if (*s == '/') {
+			*s = '\0';
+			int rc = fs_mkdir(buf);
+
+			if (rc < 0 && rc != -EEXIST) {
+				printk("[wipeout] fs_mkdir(%s) -> %d\n", buf, rc);
+			}
+			*s = '/';
+		}
+	}
+	int rc = fs_mkdir(buf);
+
+	if (rc < 0 && rc != -EEXIST) {
+		printk("[wipeout] fs_mkdir(%s) -> %d\n", buf, rc);
+	}
+}
+
 uint32_t __wrap_file_store(const char *path, void *bytes, int32_t len)
 {
 	char buf[256];
@@ -156,6 +282,7 @@ uint32_t __wrap_file_store(const char *path, void *bytes, int32_t len)
 	int rc;
 
 	pizza_resolve(buf, sizeof(buf), path);
+	pizza_mkdir_parents(buf);
 
 	fs_file_t_init(&f);
 	rc = fs_open(&f, buf, FS_O_CREATE | FS_O_WRITE | FS_O_TRUNC);
