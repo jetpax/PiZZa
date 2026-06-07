@@ -1,0 +1,140 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * PiZZa WipEout demo overlay for rpi_zero_2w.
+ *
+ *   - &mbox0 + &firmware: VC mailbox + property tags (FB alloc,
+ *     clock readback, temp).
+ *   - &vc_fb: HDMI framebuffer at the monitor's native scanout
+ *     resolution; the engine paints into a 320x240 virtual
+ *     framebuffer and the VideoCore HVS hardware scaler upscales it
+ *     to the cable on the fly. Picks the PSX-style nostalgic look
+ *     and keeps per-frame write bandwidth at 300 KiB instead of
+ *     ~7 MiB at HDMI native.
+ *   - &dma: BCM2835 DMA controller for the bcm2835_fb backbuffer
+ *     blit (fast path).
+ *   - &usb + cdc_acm child: USB CDC ACM as the interactive shell
+ *     endpoint, same shape as PizzaShell.
+ *   - SD fstab at /SD: (FATFS) for wipeout asset loading.
+ *   - mini-UART (uart1) as console + LOG_* target, matching the
+ *     PiZZa convention.
+ */
+
+#include <zephyr/dt-bindings/display/panel.h>
+
+&mbox0 {
+	status = "okay";
+};
+
+&firmware {
+	status = "okay";
+};
+
+/*
+ * BCM2835 DMA controller -- bcm2835_fb requests a free channel at
+ * init for its backbuffer->fb blit. No DT wiring on the FB side.
+ */
+&dma {
+	status = "okay";
+};
+
+&vc_fb {
+	/* No width / height: driver reads VC's EDID-negotiated scanout
+	 * mode at boot (typically 1824x984 or whatever the monitor
+	 * reports).
+	 *
+	 * render-width / render-height pin the virtual framebuffer the
+	 * ARM side paints into. 320 x 240 = 76800 px = 300 KiB at 32 bpp.
+	 * 320 * 4 = 1280 bytes = 64-byte aligned, so VC returns pitch ==
+	 * row_bytes (no padding) and the FB driver's contiguous-DMA fast
+	 * path engages. HVS scales 320x240 -> monitor native at 0 ARM
+	 * cost.
+	 */
+	pixel-format = <PANEL_PIXEL_FORMAT_ARGB_8888>;
+	render-width = <320>;
+	render-height = <240>;
+	status = "okay";
+};
+
+&i2s {
+	/* No audio yet -- left enabled in case M7 lands later. */
+	status = "okay";
+};
+
+/*
+ * Auto-mount the external microSD slot as FAT at /SD: (FATFS volume
+ * convention: the path after the leading '/' is the disk-access disk
+ * name). The board DTS registers the disk as "SD". The user extracts
+ * wipeout-data-v01.zip to /SD:/wipeout/ before flashing.
+ *
+ * Format-on-mount-fail safety: CONFIG_FILE_SYSTEM_MKFS and
+ * CONFIG_FS_FATFS_MOUNT_MKFS are both off in boards/rpi_zero_2w.conf,
+ * so a failed mount cannot accidentally erase the user's SD card.
+ */
+/ {
+	fstab {
+		compatible = "zephyr,fstab";
+
+		/* PINN RECOVERY (FAT) -- Pi firmware + dtbs + kernel.img.
+		 * Save data (small) writes go here. Mount string "/SD:"
+		 * matches CONFIG_FS_FATFS_CUSTOM_MOUNT_POINTS index 0,
+		 * which VolToPart[] maps to physical drive 0, partition 1.
+		 */
+		sd_fs: sd {
+			compatible = "zephyr,fstab,fatfs";
+			automount;
+			disk-access;
+			mount-point = "/SD:";
+		};
+
+		/* User-created FAT partition (typically partition 3 on the
+		 * PINN card) holding the wipeout/ asset tree extracted from
+		 * wipeout-data-v01.zip. Mount string "/DATA:" matches
+		 * CONFIG_FS_FATFS_CUSTOM_MOUNT_POINTS index 1, which
+		 * VolToPart[] maps to physical drive 0, partition 3. Same
+		 * physical SDHost as /SD: -- the partition split happens
+		 * inside FatFs by reading the MBR.
+		 */
+		data_fs: data {
+			compatible = "zephyr,fstab,fatfs";
+			automount;
+			disk-access;
+			mount-point = "/DATA:";
+		};
+	};
+};
+
+&usb {
+	status = "okay";
+
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+		label = "PiZZa WipEout shell (USB CDC ACM)";
+	};
+};
+
+/ {
+	chosen {
+		/* Boot logs + LOG_* on the mini-UART (uart1) at 115200 --
+		 * needs config.txt `enable_uart=1`, NOT `dtoverlay=disable-bt`.
+		 * Interactive shell on USB CDC ACM. HDMI is the engine
+		 * display target (auto-detected through DT_HAS_CHOSEN by
+		 * the FB driver).
+		 */
+		zephyr,console = &uart1;
+		zephyr,shell-uart = &cdc_acm_uart0;
+		zephyr,display = &vc_fb;
+	};
+};
+
+/* Mini-UART (uart1) console setup. Same stanza PizzaShell carries --
+ * the board DTS now defaults to PL011 @ 1 Mbaud, but PiZZa boards
+ * keep the historical mini-UART path so a stock config.txt with
+ * `enable_uart=1` (no disable-bt overlay) just works.
+ */
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_gpio14>;
+	status = "okay";
+	current-speed = <115200>;
+};

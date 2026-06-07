@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Pull in the SAMPLE_USBD_* options used by sample_usbd_init.c on
+# boards that build the USB device stack. Same pattern PizzaShell /
+# Jet use.
+
+source "samples/subsys/usb/common/Kconfig.sample_usbd"
+
+source "Kconfig.zephyr"
