@@ -203,6 +203,16 @@ static int pizza_usb_start(void)
 	}
 	return 0;
 }
+/*
+ * Bring CDC up at APPLICATION init, not from main(). The display + FATFS
+ * (microSD) + SMP bring-up that runs during main() add enough latency
+ * to push usbd_enable past macOS's USB enumeration retry window when
+ * the mini-UART is connected at boot, which silently kills CDC on the
+ * host side until the next replug. Running at APPLICATION captures
+ * the enumeration window early; the rest of main() then runs while
+ * the host completes descriptor exchange in parallel.
+ */
+SYS_INIT(pizza_usb_start, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
 #else
 static inline int pizza_usb_start(void) { return 0; }
 #endif
@@ -425,15 +435,20 @@ static int cmd_wipeout_flush(const struct shell *sh, size_t argc, char **argv)
 		return 0;
 	}
 	if (strcmp(argv[1], "parallel") == 0) {
+		extern int gfx_parallel_smp_active(void);
+
 		if (argc >= 3) bands = atoi(argv[2]);
 		if (argc >= 4) threshold = atoi(argv[3]);
 		render_software_set_parallel(1, bands, threshold);
-		shell_print(sh, "render: parallel flush bands=%d threshold=%d",
-			    bands, threshold);
-		shell_warn(sh, "SMP %s on this build -- speedup vs serial only "
-				"valid with CONFIG_SMP=y on rpi_zero_2w (board upstream: "
-				"single-core today). See gfx_parallel_smp_active().",
-				"is not enabled");
+		shell_print(sh, "render: parallel flush bands=%d threshold=%d  (cpus=%u, smp_active=%d)",
+			    bands, threshold,
+			    (unsigned)arch_num_cpus(),
+			    gfx_parallel_smp_active());
+		if (!gfx_parallel_smp_active()) {
+			shell_warn(sh, "SMP inactive: secondary cores didn't come up "
+					"or build is UP. Workers will share CPU0 and pay "
+					"barrier cost for no parallelism.");
+		}
 		return 0;
 	}
 	shell_error(sh, "unknown subcommand '%s'", argv[1]);
@@ -469,12 +484,32 @@ static int cmd_wipeout_display(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+static int cmd_wipeout_smp(const struct shell *sh, size_t argc, char **argv)
+{
+	extern int gfx_parallel_smp_active(void);
+
+	ARG_UNUSED(argc); ARG_UNUSED(argv);
+	shell_print(sh, "CONFIG_SMP=%s  MP_MAX_NUM_CPUS=%d",
+#ifdef CONFIG_SMP
+		    "y",
+#else
+		    "n",
+#endif
+		    CONFIG_MP_MAX_NUM_CPUS);
+	shell_print(sh, "arch_num_cpus() = %u  (cores ONLINE at runtime)",
+		    (unsigned)arch_num_cpus());
+	shell_print(sh, "gfx_parallel_smp_active() = %d  (renderer's worker-pool view)",
+		    gfx_parallel_smp_active());
+	return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_wipeout,
 	SHELL_CMD(fps,     NULL, "Sampled fps + per-phase us",          cmd_wipeout_fps),
 	SHELL_CMD(clock,   NULL, "VC ARM clock cur/max (Hz)",            cmd_wipeout_clock),
 	SHELL_CMD(flush,   NULL, "serial | parallel [bands] [threshold]", cmd_wipeout_flush),
-	SHELL_CMD(capture, NULL, "Dump next frame to /SD:/wipeout-frame.ppm", cmd_wipeout_capture),
+	SHELL_CMD(capture, NULL, "Dump next frame to /DATA:/wipeout-frame.ppm", cmd_wipeout_capture),
 	SHELL_CMD(display, NULL, "Display capabilities + ready state",   cmd_wipeout_display),
+	SHELL_CMD(smp,     NULL, "SMP build + runtime status",           cmd_wipeout_smp),
 	SHELL_SUBCMD_SET_END
 );
 SHELL_CMD_REGISTER(wipeout, &sub_wipeout, "PiZZa WipEout demo control", NULL);
@@ -486,8 +521,8 @@ SHELL_CMD_REGISTER(wipeout, &sub_wipeout, "PiZZa WipEout demo control", NULL);
 int main(void)
 {
 	printk("\n[wipeout] PiZZa WipEout demo -- rpi_zero_2w SOFTWARE renderer\n");
-
-	(void)pizza_usb_start();
+	printk("[wipeout] SMP: arch_num_cpus()=%u  (MP_MAX_NUM_CPUS=%d)\n",
+	       (unsigned)arch_num_cpus(), CONFIG_MP_MAX_NUM_CPUS);
 
 	pizza_display = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
 	if (!device_is_ready(pizza_display)) {
