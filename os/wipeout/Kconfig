@@ -40,4 +40,47 @@ config WIPEOUT_RENDERER_PIZZA
 
 endchoice
 
+config WIPEOUT_USE_QPU_TRANSFORM
+	bool "Use V3D QPU for vec3_transform_perspective (EMPIRICALLY SLOWER)"
+	default n
+	depends on WIPEOUT_RENDERER_SMP
+	select BCM2835_V3D
+	help
+	  Offload the per-frame vec3_transform_perspective vertex math
+	  from the A53 onto the BCM2710 V3D QPUs.
+
+	  *** EMPIRICALLY NET-NEGATIVE -- DEFAULT OFF FOR A REASON ***
+
+	  Standalone the QPU is ~9x faster per vertex than scalar
+	  (48 ns vs 445 ns; see samples/drivers/bcm2835_v3d/vec3_xform).
+	  But wipeout's renderer hands tris in 3-vert chunks, forcing
+	  per-tri staging into V3D coherent memory + per-flush scatter/
+	  gather. Measured via `wipeout bench all` (2026-06-09 on
+	  rpi_zero_2w, NUM_QPUS=12, Normal-NC mapping + DSB barriers,
+	  fused scatter, MIN_TRIS_FOR_KICK=64):
+
+	    config                  scalar   QPU      delta
+	    parallel-4  1000t / 1m   5753us  9205us   1.60x slower
+	    parallel-4  3000t / 3m  14127us 24578us   1.74x slower
+	    parallel-4  5000t / 3m  22589us 40088us   1.77x slower
+	    parallel-4  7000t / 3m  30981us 55456us   1.79x slower
+
+	  Per-tri the QPU integration costs ~3.5 us of staging +
+	  finalize + scatter/gather overhead, displacing only ~1.3 us
+	  of scalar transform (3 verts * 445 ns). The arithmetic does
+	  not work out at this batching granularity -- no incremental
+	  fix (drop AoS staging ~500 us/frame, bucket-on-stage
+	  ~100 us/frame) closes the multi-millisecond gap.
+
+	  Where the QPU genuinely wins on this silicon: single big-
+	  batch kernels in the thousands+ of items (FFT, image filters,
+	  small-model inference). Per-frame vertex transform in a
+	  3-vert-at-a-time renderer is the wrong shape.
+
+	  Enable only for code-path experimentation; the renderer falls
+	  back to scalar for batches smaller than 64 triangles and on
+	  QPU failure, so output is always correct (~16 ULP from
+	  scalar, sub-pixel on a 240p framebuffer). The performance
+	  cost is real and visible.
+
 source "Kconfig.zephyr"

@@ -98,6 +98,19 @@ set(WIPEOUT_PORT_SRC
   src/wipeout_glue.c
 )
 
+# CONFIG_WIPEOUT_USE_QPU_TRANSFORM=y pulls in the V3D-QPU helper
+# (wipeout_qpu.c) and the pre-compiled vec3_xform shader bundle.
+# The shader sources are checked in alongside vc4asm-produced output
+# to keep the build toolchain-independent of vc4asm; rebuild with
+#   /opt/homebrew/opt/vc4asm/bin/vc4asm -V -c vec3_xform_code.c \
+#     -h vec3_xform_code.h -i vc4.qinc vec3_xform.qasm
+if(CONFIG_WIPEOUT_USE_QPU_TRANSFORM)
+  list(APPEND WIPEOUT_PORT_SRC
+    src/wipeout_qpu.c
+    src/vec3_xform_code.c
+  )
+endif()
+
 target_sources(app PRIVATE
   ${WIPEOUT_COMMON_SRC}
   ${WIPEOUT_PORT_SRC}

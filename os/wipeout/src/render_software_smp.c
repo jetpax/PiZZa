@@ -37,6 +37,12 @@
 
 #include "gfx_parallel.h"
 
+#ifdef CONFIG_WIPEOUT_USE_QPU_TRANSFORM
+#include <errno.h>
+#include <zephyr/sys/printk.h>
+#include "wipeout_qpu.h"
+#endif
+
 /* (1) thread-local band bounds. Default span is the whole screen so
  * the serial path -- which never touches g_band_y0/y1 -- behaves as
  * if the test in (2) is unconditionally true.
@@ -99,6 +105,12 @@ static void draw_tris(clip_tris_t t);
 static void render_flush(void);
 static void render_flush_serial(void);
 static void render_flush_parallel(int nbands);
+static void emit_post_transform(const vec4_t clip_pos[3], const vec2_t uv[3],
+                                const rgba_t color_in[3], uint16_t texture_index);
+#ifdef CONFIG_WIPEOUT_USE_QPU_TRANSFORM
+static void qpu_emit_cb(const vec4_t clip_pos[3], const vec2_t uv[3],
+                        const rgba_t color[3], uint16_t texture_index, void *ctx);
+#endif
 
 static rgba_t *screen_buffer;
 static int32_t screen_pitch;
@@ -139,6 +151,24 @@ void render_init(vec2i_t s) {
 		rgba(128,128,128,255), rgba(128,128,128,255)
 	};
 	RENDER_NO_TEXTURE = render_texture_create(2, 2, white_pixels);
+
+#ifdef CONFIG_WIPEOUT_USE_QPU_TRANSFORM
+	/* Eager V3D bring-up so the first frame doesn't pay the alloc +
+	 * power-up cost. If this fails, wpqpu_finalize() silently falls
+	 * back to scalar -- the renderer continues to work, just without
+	 * the QPU speedup. The log line tells you which mode you got.
+	 * Using printk rather than printf -- printf has gone silent in
+	 * this game-thread context for reasons I haven't tracked down,
+	 * but printk from the same context lands fine.
+	 */
+	int qpu_rc = wpqpu_init();
+	if (qpu_rc) {
+		printk("[wipeout] wpqpu_init failed (%d) -- scalar fallback engaged\n",
+		       qpu_rc);
+	} else {
+		printk("[wipeout] V3D QPU transform path active\n");
+	}
+#endif
 }
 
 void render_cleanup(void) {
@@ -330,6 +360,15 @@ static void render_flush_parallel(int nbands) {
 }
 
 static void render_flush(void) {
+#ifdef CONFIG_WIPEOUT_USE_QPU_TRANSFORM
+	/* Drain any staged tris through the QPU + per-tri post-process
+	 * (emit_post_transform via qpu_emit_cb). Adds to tris_buffer.
+	 * Returns nonzero only on QPU failure -- which already fell back
+	 * to scalar internally, so the buffer is still correct.
+	 */
+	(void)wpqpu_finalize(qpu_emit_cb, NULL);
+#endif
+
 	running_stats.num_tris += tris_buffer_len;
 	running_stats.num_draw_calls++;
 
@@ -384,22 +423,24 @@ static int clip_near(clip_vert_t *in, int in_len, clip_vert_t *out) {
 	return out_len;
 }
 
-void render_push_tris(tris_t tris, uint16_t texture_index) {
-	if (tris_buffer_len >= TRIS_BUFFER_SIZE - 8) {
-		render_flush();
-	}
-
-	error_if(texture_index >= textures_len, "Invalid texture %d", texture_index);
+/* Shared bottom half of render_push_tris: given the already-transformed
+ * clip_pos for the three vertices (+ uv + color + texture), do the near-
+ * plane clip, perspective divide, and fan-triangulation into tris_buffer.
+ * Used by both the scalar render_push_tris path and the QPU finalize
+ * callback (qpu_emit_cb).
+ */
+static void emit_post_transform(const vec4_t clip_pos[3], const vec2_t uv[3],
+                                const rgba_t color_in[3], uint16_t texture_index) {
 	render_texture_t *texture = &textures[texture_index];
 
-	vec4_t color0 = rgba_to_vec4(tris.vertices[0].color);
-	vec4_t color1 = rgba_to_vec4(tris.vertices[1].color);
-	vec4_t color2 = rgba_to_vec4(tris.vertices[2].color);
+	vec4_t color0 = rgba_to_vec4(color_in[0]);
+	vec4_t color1 = rgba_to_vec4(color_in[1]);
+	vec4_t color2 = rgba_to_vec4(color_in[2]);
 
 	clip_vert_t in[3] = {
-		{.clip_pos = vec3_transform_perspective(tris.vertices[0].pos, &mvp_mat), .uv = tris.vertices[0].uv, .color = color0},
-		{.clip_pos = vec3_transform_perspective(tris.vertices[1].pos, &mvp_mat), .uv = tris.vertices[1].uv, .color = color1},
-		{.clip_pos = vec3_transform_perspective(tris.vertices[2].pos, &mvp_mat), .uv = tris.vertices[2].uv, .color = color2},
+		{.clip_pos = clip_pos[0], .uv = uv[0], .color = color0},
+		{.clip_pos = clip_pos[1], .uv = uv[1], .color = color1},
+		{.clip_pos = clip_pos[2], .uv = uv[2], .color = color2},
 	};
 	clip_vert_t clipped[8];
 	int clipped_len = clip_near(in, len(in), clipped);
@@ -420,6 +461,66 @@ void render_push_tris(tris_t tris, uint16_t texture_index) {
 			.verts = {clipped[0], clipped[i], clipped[i + 1]}
 		};
 	}
+}
+
+#ifdef CONFIG_WIPEOUT_USE_QPU_TRANSFORM
+/* Adapter so wpqpu_finalize can drive emit_post_transform. Also drains
+ * tris_buffer mid-finalize if it's about to overflow -- we can't call
+ * render_flush() here because that'd re-enter wpqpu_finalize on the
+ * staged tris currently being iterated.
+ */
+static void qpu_emit_cb(const vec4_t clip_pos[3], const vec2_t uv[3],
+                        const rgba_t color[3], uint16_t texture_index, void *ctx) {
+	(void)ctx;
+	if (tris_buffer_len >= TRIS_BUFFER_SIZE - 8) {
+		running_stats.num_tris += tris_buffer_len;
+		if (s_parallel_enabled && tris_buffer_len >= s_parallel_threshold) {
+			render_flush_parallel(s_parallel_bands);
+		} else {
+			render_flush_serial();
+		}
+	}
+	emit_post_transform(clip_pos, uv, color, texture_index);
+}
+#endif
+
+void render_push_tris(tris_t tris, uint16_t texture_index) {
+	error_if(texture_index >= textures_len, "Invalid texture %d", texture_index);
+
+#ifdef CONFIG_WIPEOUT_USE_QPU_TRANSFORM
+	/* Defer transform + clip + project until render_flush, where
+	 * wpqpu_finalize batches all staged tris into one QPU kick per
+	 * distinct MVP matrix. Falls back to scalar inside finalize when
+	 * the staged batch is below the QPU's win threshold (64 tris).
+	 */
+	vec3_t pos[3]   = {tris.vertices[0].pos,   tris.vertices[1].pos,   tris.vertices[2].pos};
+	vec2_t uv[3]    = {tris.vertices[0].uv,    tris.vertices[1].uv,    tris.vertices[2].uv};
+	rgba_t color[3] = {tris.vertices[0].color, tris.vertices[1].color, tris.vertices[2].color};
+
+	int rc = wpqpu_stage_tri(&mvp_mat, pos, uv, color, texture_index);
+
+	if (rc == -ENOMEM) {
+		/* Staging full -- drain via render_flush (which calls
+		 * wpqpu_finalize first, then sorts + rasterizes tris_buffer)
+		 * and retry the stage.
+		 */
+		render_flush();
+		(void)wpqpu_stage_tri(&mvp_mat, pos, uv, color, texture_index);
+	}
+#else
+	if (tris_buffer_len >= TRIS_BUFFER_SIZE - 8) {
+		render_flush();
+	}
+
+	vec4_t clip_pos[3] = {
+		vec3_transform_perspective(tris.vertices[0].pos, &mvp_mat),
+		vec3_transform_perspective(tris.vertices[1].pos, &mvp_mat),
+		vec3_transform_perspective(tris.vertices[2].pos, &mvp_mat),
+	};
+	vec2_t uv[3]    = {tris.vertices[0].uv,    tris.vertices[1].uv,    tris.vertices[2].uv};
+	rgba_t color[3] = {tris.vertices[0].color, tris.vertices[1].color, tris.vertices[2].color};
+	emit_post_transform(clip_pos, uv, color, texture_index);
+#endif
 }
 
 void render_push_sprite(vec3_t pos, vec2i_t size, rgba_t color, uint16_t texture_index) {
