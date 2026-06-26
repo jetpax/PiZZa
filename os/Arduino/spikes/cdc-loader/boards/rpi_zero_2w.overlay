@@ -1,0 +1,51 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * PiZZa CDC-loader spike overlay for rpi_zero_2w.
+ *   - &mbox0 + &firmware: VC mailbox (USB PHY power-on).
+ *   - &usb + cdc_acm_uart0: the upload channel (raw CDC, no shell).
+ *   - &uart1: mini-UART console + LOG_* at 115200.
+ *   - fstab /SD:: FATFS on the SD, mounted + OWNED by the firmware
+ *     (no MSC -- the host never touches the card directly).
+ */
+
+&mbox0 {
+	status = "okay";
+};
+
+&firmware {
+	status = "okay";
+};
+
+&usb {
+	status = "okay";
+
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+		label = "PiZZa CDC upload";
+	};
+};
+
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_gpio14>;
+	status = "okay";
+	current-speed = <115200>;
+};
+
+/ {
+	chosen {
+		zephyr,console = &uart1;
+	};
+
+	fstab {
+		compatible = "zephyr,fstab";
+
+		sd: sd {
+			compatible = "zephyr,fstab,fatfs";
+			disk-access;
+			automount;
+			mount-point = "/SD:";
+		};
+	};
+};

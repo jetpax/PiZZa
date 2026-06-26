@@ -1,0 +1,41 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * PiZZa MSC spike overlay for rpi_zero_2w.
+ *   - &mbox0 + &firmware: VC mailbox (USB PHY power-on at boot).
+ *   - &usb: DWC2 OTG controller, device mode (no CDC child -- MSC only).
+ *   - &uart1: mini-UART console + LOG_* at 115200.
+ *
+ * No fstab: MSC owns the SD raw disk; the host mounts the FAT.
+ */
+
+&mbox0 {
+	status = "okay";
+};
+
+&firmware {
+	status = "okay";
+};
+
+&usb {
+	status = "okay";
+
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+		label = "PiZZa CDC+MSC spike shell";
+	};
+};
+
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_gpio14>;
+	status = "okay";
+	current-speed = <115200>;
+};
+
+/ {
+	chosen {
+		zephyr,console = &uart1;
+		zephyr,shell-uart = &cdc_acm_uart0;
+	};
+};
