@@ -1,0 +1,12 @@
+# Raspberry Pi firmware config for the PiZZA Arduino loader.
+# Boots zephyr.bin (the loader) as a 64-bit kernel on the Pi Zero 2 W.
+
+arm_64bit=1
+# enable_uart routes the mini-UART to GPIO14/15 and pins core_freq so the
+# baud divisor stays valid -- this is Arduino Serial1 + the loader log @115200.
+enable_uart=1
+core_freq=250
+kernel_address=0x200000
+kernel=zephyr.bin
+# Bring HDMI up at boot even with no monitor attached (harmless if unused).
+hdmi_force_hotplug=1
