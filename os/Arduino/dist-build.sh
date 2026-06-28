@@ -90,6 +90,17 @@ extra/gen_provides.py "${BUILD_DIR}/zephyr/zephyr.elf" -LF \
 	"random=__wrap_random" > "${VARIANT_DIR}/syms-static.ld"
 cmake -P extra/gen_arduino_files.cmake "${variant}"
 
+# The regenerated EDK's autoconf.h can change kernel struct layouts (e.g.
+# CONFIG_POLL grows struct k_sem, which the Arduino `Serial` embeds). arduino-cli
+# keys its core cache on flag *strings*, not autoconf *contents*, so it silently
+# reuses a core compiled against the old config -> a runtime ABI mismatch that
+# corrupts kernel objects (sys_dlist_remove -> FAR=0). Invalidate the core cache
+# so the next `arduino-cli compile` rebuilds the core against this EDK. (Placed
+# before the boards.local.txt step, whose trailing non-zero exit is benign.)
+rm -rf "${HOME}/Library/Caches/arduino/cores/"* \
+       "${HOME}/Library/Caches/arduino/sketches/"* 2>/dev/null || true
+echo "Cleared arduino-cli core + per-sketch caches (EDK changed -> recompile)."
+
 echo "==> [6/6] Regenerate boards.local.txt"
 board="pizza"
 gv() { grep -E "\<${2//./\\.}\>\s*=" "$1" | tail -n 1 | cut -d '=' -f 2- | tr -d '); '; }
