@@ -73,19 +73,6 @@ From here, every **Upload** streams the sketch to the loader, which writes it
 to the SD and triggers a cold reset of the Pi (~1 s) — when the loader comes
 back up it auto-loads the new sketch. No card swap, no manual re-flash.
 
-## What's new in 0.3.2
-
-- **Reset-on-swap architecture.** Each sketch starts on a freshly-booted
-  kernel. The previous in-process llext swap occasionally left loader-side
-  state (brcmfmac, netif, k_work, GPIO ISRs) pointing into freed sketch
-  memory; the next sketch would then fault inside the loader ~1.5 s after
-  start. Resetting eliminates the whole class of state-leak bugs.
-- **IDE Serial Monitor echo fix.** `SerialUSB::write` no longer gates on
-  DTR, which the Arduino IDE Serial Monitor doesn't reliably assert on
-  macOS. HelloSerial-style echo sketches now work out of the box.
-- **BCM2710 `sys_arch_reboot` driver.** Tiny 15-line PM-watchdog reset path
-  (mirrors Linux `bcm2835_wdt`) so `sys_reboot()` is functional on this SoC.
-
 ## Serial & upload
 
 - **Serial = USB CDC.** Arduino `Serial` is the `usbmodem…` / `ttyACM…` port.
@@ -106,23 +93,6 @@ back up it auto-loads the new sketch. No card swap, no manual re-flash.
 Not available yet: **ADC / `analogRead`**, **PWM / `analogWrite`**. Libraries with
 no driver wired in the variant overlay aren't shipped (Camera, Storage, SDRAM,
 Ethernet, CAN, LED Matrix, RTC); they can be re-enabled as the drivers land.
-
-## Troubleshooting
-
-- **"Error communicating with the language server: write EPIPE."** A harmless
-  Arduino IDE hiccup, common right after a Boards Manager update — **restart the
-  IDE**. Verify/Upload are unaffected.
-- **A sketch uploads but crashes / the LED won't blink.** Make sure you installed
-  the **latest** PiZZA version, then re-Verify (a stale cached build can mismatch
-  the loader). Watch the mini-UART (`Serial1`, 115200) for the loader's log.
-- **`arduino-cli upload` fails with "Serial port busy", or your terminal sees
-  no output.** Quit the Arduino IDE (⌘Q on macOS). The IDE's Serial Monitor
-  subprocess auto-grabs the port the moment it enumerates, and *respawns* if
-  you kill it — only quitting the IDE releases the port for `arduino-cli`,
-  `tio`, or `screen`.
-- **Two boards both named "PiZZA"?** Use the one from **Boards Manager**
-  (`pizza:zephyr:pizza`), not a local dev board (`arduino-git:zephyr:pizza`,
-  which exists only if you've set up the dev symlink).
 
 ## Under the hood
 
