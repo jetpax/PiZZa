@@ -74,18 +74,42 @@ set(WIPEOUT_COMMON_SRC
   ${WIPEOUT_SRC_DIR}/wipeout/sfx.c
 )
 
-# Port sources. render_software_smp.c is the upstream renderer with
-# the band edit applied + gfx_parallel_run wiring; gfx_parallel_zephyr.c
-# is the persistent worker pool (band 0 on caller); platform_zephyr.c
-# is the platform.h backend + the Zephyr main thread that drives the
-# game loop; wipeout_glue.c wraps the engine's file_* helpers onto
-# Zephyr fs_* + /SD: prefix.
+# Port sources. The rasteriser file is picked by Kconfig:
+#   CONFIG_WIPEOUT_RENDERER_SMP (default) -> render_software_smp.c,
+#     the upstream renderer with the band edit applied + gfx_parallel_run
+#     wiring.
+#   CONFIG_WIPEOUT_RENDERER_PIZZA -> render_software_pizza.c, the
+#     Q16/RGB565 rewrite (scaffolding only; see
+#     notes/wipeout_pizza_renderer_spec.md).
+# gfx_parallel_zephyr.c is the persistent worker pool (band 0 on
+# caller); platform_zephyr.c is the platform.h backend + the Zephyr
+# main thread that drives the game loop; wipeout_glue.c wraps the
+# engine's file_* helpers onto Zephyr fs_* + /SD: prefix.
+if(CONFIG_WIPEOUT_RENDERER_PIZZA)
+  set(WIPEOUT_RENDERER_SRC src/render_software_pizza.c)
+else()
+  set(WIPEOUT_RENDERER_SRC src/render_software_smp.c)
+endif()
+
 set(WIPEOUT_PORT_SRC
-  src/render_software_smp.c
+  ${WIPEOUT_RENDERER_SRC}
   src/gfx_parallel_zephyr.c
   src/platform_zephyr.c
   src/wipeout_glue.c
 )
+
+# CONFIG_WIPEOUT_USE_QPU_TRANSFORM=y pulls in the V3D-QPU helper
+# (wipeout_qpu.c) and the pre-compiled vec3_xform shader bundle.
+# The shader sources are checked in alongside vc4asm-produced output
+# to keep the build toolchain-independent of vc4asm; rebuild with
+#   /opt/homebrew/opt/vc4asm/bin/vc4asm -V -c vec3_xform_code.c \
+#     -h vec3_xform_code.h -i vc4.qinc vec3_xform.qasm
+if(CONFIG_WIPEOUT_USE_QPU_TRANSFORM)
+  list(APPEND WIPEOUT_PORT_SRC
+    src/wipeout_qpu.c
+    src/vec3_xform_code.c
+  )
+endif()
 
 target_sources(app PRIVATE
   ${WIPEOUT_COMMON_SRC}

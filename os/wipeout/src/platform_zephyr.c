@@ -303,6 +303,82 @@ extern int pizza_capture_frame(const rgba_t *buf, int w, int h);
 
 extern void pizza_sd_diag(void);
 
+/* ------------------------------------------------------------------ *
+ *  Deterministic synthetic-scene benchmark (`wipeout bench`)
+ *
+ *  Runs IN the game thread, replacing system_update() for N frames
+ *  with a hand-built render call sequence that has bit-identical
+ *  geometry every time (RNG reseeded per frame, fixed mvps, fixed
+ *  primitive shape). Lets us compare scalar-vs-QPU builds at the
+ *  same workload without trying to navigate the game to a matched
+ *  scene.
+ * ------------------------------------------------------------------ */
+
+static volatile bool     pizza_bench_active;
+static volatile int      pizza_bench_remaining;
+static volatile int      pizza_bench_n_tris;
+static volatile int      pizza_bench_n_mvps;
+static volatile uint32_t pizza_bench_min_cyc;
+static volatile uint32_t pizza_bench_max_cyc;
+static volatile uint64_t pizza_bench_total_cyc;
+static volatile uint32_t pizza_bench_frames_done;
+static volatile uint32_t pizza_bench_stat_frames;
+static volatile bool     pizza_bench_done;
+
+static mat4_t pizza_bench_mvps[16];
+
+#define PIZZA_BENCH_WARMUP_FRAMES 2
+
+static void pizza_bench_one_frame(int n_tris, int n_mvps)
+{
+	/* Fixed RNG seed reset every frame -> identical geometry every
+	 * frame -> stable per-frame timing across runs and across builds.
+	 */
+	uint32_t rng = 0xCAFEBABEu;
+
+	render_frame_prepare();
+
+	/* Pin view to identity-at-origin so the engine's projection_mat
+	 * (set up by render_set_screen_size during render_init) combined
+	 * with our bench mvps puts everything in front of the camera
+	 * deterministically.
+	 */
+	render_set_view(vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 0.0f, 0.0f));
+
+	int per_mvp = (n_tris + n_mvps - 1) / n_mvps;
+	int cur_mvp = -1;
+
+	for (int t = 0; t < n_tris; t++) {
+		int mvp_idx = (t / per_mvp);
+		if (mvp_idx >= n_mvps) {
+			mvp_idx = n_mvps - 1;
+		}
+		if (mvp_idx != cur_mvp) {
+			render_set_model_mat(&pizza_bench_mvps[mvp_idx]);
+			cur_mvp = mvp_idx;
+		}
+
+		rng = rng * 1664525u + 1013904223u;
+		float x = ((float)(int32_t)rng / 2147483648.0f) * 40.0f;
+		rng = rng * 1664525u + 1013904223u;
+		float y = ((float)(int32_t)rng / 2147483648.0f) * 30.0f;
+		rng = rng * 1664525u + 1013904223u;
+		/* Z in [-100, -50] -- always in front of the camera so
+		 * clip_near doesn't reject and reshape per-frame work.
+		 */
+		float z = -50.0f - (((float)(uint32_t)rng / 4294967296.0f) * 50.0f);
+
+		tris_t tri = {{
+			{.pos = vec3(x,        y,        z), .uv = vec2(0.0f,  0.0f),  .color = rgba(255, 100, 100, 255)},
+			{.pos = vec3(x + 1.5f, y,        z), .uv = vec2(64.0f, 0.0f),  .color = rgba(100, 255, 100, 255)},
+			{.pos = vec3(x,        y + 1.5f, z), .uv = vec2(0.0f,  64.0f), .color = rgba(100, 100, 255, 255)},
+		}};
+		render_push_tris(tri, RENDER_NO_TEXTURE);
+	}
+
+	render_frame_end();
+}
+
 static void pizza_game_loop(void *p1, void *p2, void *p3)
 {
 	ARG_UNUSED(p1);
@@ -322,9 +398,39 @@ static void pizza_game_loop(void *p1, void *p2, void *p3)
 	const uint64_t cycles_per_sec = sys_clock_hw_cycles_per_sec();
 
 	for (;;) {
+		bool benching = pizza_bench_active;
 		uint32_t c0 = k_cycle_get_32();
-		system_update();
+
+		if (benching) {
+			pizza_bench_one_frame(pizza_bench_n_tris, pizza_bench_n_mvps);
+		} else {
+			system_update();
+		}
 		uint32_t c1 = k_cycle_get_32();
+
+		if (benching) {
+			uint32_t cyc = c1 - c0;
+
+			pizza_bench_frames_done++;
+			/* Skip warmup: first few frames pay cold-cache + first-
+			 * kick QPU allocation costs that don't reflect steady
+			 * state. Discard from stats but still tick remaining.
+			 */
+			if (pizza_bench_frames_done > PIZZA_BENCH_WARMUP_FRAMES) {
+				pizza_bench_total_cyc += cyc;
+				if (cyc < pizza_bench_min_cyc) {
+					pizza_bench_min_cyc = cyc;
+				}
+				if (cyc > pizza_bench_max_cyc) {
+					pizza_bench_max_cyc = cyc;
+				}
+				pizza_bench_stat_frames++;
+			}
+			if (--pizza_bench_remaining <= 0) {
+				pizza_bench_active = false;
+				pizza_bench_done = true;
+			}
+		}
 
 		(void)pizza_present();
 		uint32_t c2 = k_cycle_get_32();
@@ -503,6 +609,182 @@ static int cmd_wipeout_smp(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+/* Run one bench config. Returns 0 + writes stats on success, -errno on
+ * failure. Same engine plumbing as the interactive command path.
+ */
+static int run_bench_config(int frames, int n_tris, int n_mvps,
+			    uint32_t *out_mean_us,
+			    uint32_t *out_min_us,
+			    uint32_t *out_max_us,
+			    uint32_t *out_stat_frames)
+{
+	if (frames < 1) {
+		frames = 1;
+	}
+	if (frames > 1000) {
+		frames = 1000;
+	}
+	if (n_tris < 1) {
+		n_tris = 1;
+	}
+	if (n_tris > 8000) {
+		n_tris = 8000;
+	}
+	if (n_mvps < 1) {
+		n_mvps = 1;
+	}
+	if (n_mvps > 16) {
+		n_mvps = 16;
+	}
+
+	for (int i = 0; i < n_mvps; i++) {
+		float s = 0.8f + (float)i * 0.1f;
+		float tx = -2.0f + (float)i * 0.5f;
+		float ty = 1.0f + (float)i * 0.3f;
+
+		pizza_bench_mvps[i] = mat4(
+			 s,   0,   0,   0,
+			 0,   s,   0,   0,
+			 0,   0,   1,   0,
+			tx,  ty, -5,    1);
+	}
+
+	pizza_bench_n_tris = n_tris;
+	pizza_bench_n_mvps = n_mvps;
+	pizza_bench_min_cyc = UINT32_MAX;
+	pizza_bench_max_cyc = 0;
+	pizza_bench_total_cyc = 0;
+	pizza_bench_frames_done = 0;
+	pizza_bench_stat_frames = 0;
+	pizza_bench_done = false;
+	pizza_bench_remaining = frames + PIZZA_BENCH_WARMUP_FRAMES;
+	pizza_bench_active = true;
+
+	int64_t deadline = k_uptime_get() + 30000;
+
+	while (!pizza_bench_done) {
+		if (k_uptime_get() > deadline) {
+			pizza_bench_active = false;
+			return -ETIMEDOUT;
+		}
+		k_sleep(K_MSEC(50));
+	}
+
+	uint32_t cps = (uint32_t)sys_clock_hw_cycles_per_sec();
+	uint32_t nstat = pizza_bench_stat_frames;
+
+	*out_mean_us = nstat
+		? (uint32_t)((pizza_bench_total_cyc / nstat) * 1000000ULL / cps)
+		: 0u;
+	*out_min_us = (uint32_t)((uint64_t)pizza_bench_min_cyc * 1000000ULL / cps);
+	*out_max_us = (uint32_t)((uint64_t)pizza_bench_max_cyc * 1000000ULL / cps);
+	*out_stat_frames = nstat;
+	return 0;
+}
+
+/* Predefined matrix for `wipeout bench all`. Six configs covering
+ * the speedup curve's interesting points: low/typical/high tri count
+ * under both serial and parallel-4 raster. Per-config 30 frames
+ * (+2 warmup) -> ~15-30 s wall total at ~50 ms/frame.
+ */
+struct bench_suite_row {
+	const char *label;
+	int frames;
+	int n_tris;
+	int n_mvps;
+	int parallel_bands;  /* 0 = serial */
+};
+
+static const struct bench_suite_row bench_suite[] = {
+	/* QPU win threshold: 1000 tris / 1 mvp = one big batch per finalize. */
+	{"parallel-4  1000t / 1m", 30, 1000, 1, 4},
+	{"parallel-4  3000t / 3m", 30, 3000, 3, 4},
+	{"parallel-4  5000t / 3m", 30, 5000, 3, 4},
+	{"parallel-4  7000t / 3m", 30, 7000, 3, 4},
+	{"serial      3000t / 3m", 30, 3000, 3, 0},
+	{"serial      5000t / 3m", 30, 5000, 3, 0},
+};
+
+#define BENCH_SUITE_LEN (sizeof(bench_suite) / sizeof(bench_suite[0]))
+
+static int cmd_wipeout_bench(const struct shell *sh, size_t argc, char **argv)
+{
+	if (pizza_bench_active) {
+		shell_error(sh, "bench already running");
+		return -EBUSY;
+	}
+
+	bool run_all = (argc > 1) && (strcmp(argv[1], "all") == 0);
+
+	if (run_all) {
+		shell_print(sh, "[bench-suite] %u configs (~15-30 s total)",
+			    (unsigned)BENCH_SUITE_LEN);
+		shell_print(sh,
+			    "  %-24s  mean_us   min_us   max_us    fps   frames",
+			    "config");
+
+		for (size_t i = 0; i < BENCH_SUITE_LEN; i++) {
+			const struct bench_suite_row *row = &bench_suite[i];
+
+			if (row->parallel_bands > 0) {
+				render_software_set_parallel(1, row->parallel_bands, 64);
+			} else {
+				render_software_set_parallel(0, 1, 64);
+			}
+
+			uint32_t mean_us = 0, min_us = 0, max_us = 0, nstat = 0;
+			int rc = run_bench_config(row->frames, row->n_tris, row->n_mvps,
+						  &mean_us, &min_us, &max_us, &nstat);
+			if (rc) {
+				shell_error(sh, "  %-24s  TIMEOUT/ERROR rc=%d",
+					    row->label, rc);
+				continue;
+			}
+			uint32_t fps_x100 = mean_us > 0u
+				? (100u * 1000000u / mean_us)
+				: 0u;
+
+			shell_print(sh,
+				    "  %-24s  %7u  %7u  %7u  %3u.%02u  %5u",
+				    row->label, mean_us, min_us, max_us,
+				    fps_x100 / 100u, fps_x100 % 100u, nstat);
+		}
+
+		shell_print(sh, "[bench-suite] done");
+		return 0;
+	}
+
+	/* Single-config form: `wipeout bench [frames] [tris] [mvps]`. */
+	int frames = (argc > 1) ? atoi(argv[1]) : 60;
+	int n_tris = (argc > 2) ? atoi(argv[2]) : 3000;
+	int n_mvps = (argc > 3) ? atoi(argv[3]) : 3;
+
+	shell_print(sh, "[bench] %d frames (+%d warmup) x %d tris x %d mvps...",
+		    frames, PIZZA_BENCH_WARMUP_FRAMES, n_tris, n_mvps);
+
+	uint32_t mean_us = 0, min_us = 0, max_us = 0, nstat = 0;
+	int rc = run_bench_config(frames, n_tris, n_mvps,
+				  &mean_us, &min_us, &max_us, &nstat);
+	if (rc == -ETIMEDOUT) {
+		shell_error(sh, "bench timeout after 30s (engine stuck?)");
+		return rc;
+	}
+	if (rc) {
+		shell_error(sh, "bench failed rc=%d", rc);
+		return rc;
+	}
+
+	uint32_t fps_x100 = mean_us > 0u
+		? (100u * 1000000u / mean_us)
+		: 0u;
+
+	shell_print(sh, "[bench] tris=%d mvps=%d stat_frames=%u",
+		    n_tris, n_mvps, nstat);
+	shell_print(sh, "[bench] mean=%u us  min=%u us  max=%u us  fps=%u.%02u",
+		    mean_us, min_us, max_us, fps_x100 / 100u, fps_x100 % 100u);
+	return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_wipeout,
 	SHELL_CMD(fps,     NULL, "Sampled fps + per-phase us",          cmd_wipeout_fps),
 	SHELL_CMD(clock,   NULL, "VC ARM clock cur/max (Hz)",            cmd_wipeout_clock),
@@ -510,6 +792,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_wipeout,
 	SHELL_CMD(capture, NULL, "Dump next frame to /DATA:/wipeout-frame.ppm", cmd_wipeout_capture),
 	SHELL_CMD(display, NULL, "Display capabilities + ready state",   cmd_wipeout_display),
 	SHELL_CMD(smp,     NULL, "SMP build + runtime status",           cmd_wipeout_smp),
+	SHELL_CMD(bench,   NULL, "[frames] [tris] [mvps] or 'all' -- deterministic synthetic frame timer", cmd_wipeout_bench),
 	SHELL_SUBCMD_SET_END
 );
 SHELL_CMD_REGISTER(wipeout, &sub_wipeout, "PiZZa WipEout demo control", NULL);

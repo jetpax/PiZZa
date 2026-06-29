@@ -31,6 +31,17 @@
 };
 
 /*
+ * VideoCore IV V3D (the 12-QPU compute block) -- only instantiated
+ * by the bcm2835_v3d driver if CONFIG_BCM2835_V3D=y, which is
+ * selected by CONFIG_WIPEOUT_USE_QPU_TRANSFORM. Leaving it enabled
+ * here when QPU offload is off is harmless -- the driver simply
+ * isn't built in.
+ */
+&v3d {
+	status = "okay";
+};
+
+/*
  * BCM2835 DMA controller -- bcm2835_fb requests a free channel at
  * init for its backbuffer->fb blit. No DT wiring on the FB side.
  */

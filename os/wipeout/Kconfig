@@ -6,4 +6,81 @@
 
 source "samples/subsys/usb/common/Kconfig.sample_usbd"
 
+# Which port-side rasteriser to compile. The SMP renderer is the
+# shipping renderer; the PiZZa renderer is the in-development
+# Q16-RGB565 rewrite per notes/wipeout_pizza_renderer_spec.md.
+# Today's builds keep the SMP default; flipping the gate swaps in
+# the new file.
+choice
+	prompt "Wipeout software renderer backend"
+	default WIPEOUT_RENDERER_SMP
+	help
+	  Selects which renderer source file the wipeout port compiles.
+	  Both files implement the same render.h API; only one is
+	  linked into a given build.
+
+config WIPEOUT_RENDERER_SMP
+	bool "Float ARGB_8888 SMP renderer (shipping)"
+	help
+	  render_software_smp.c -- the upstream phoboslab renderer plus
+	  the PiZZa SMP band edits. Shipping configuration. ARGB_8888
+	  framebuffer, float-per-pixel inner loop, scanline rasteriser.
+
+config WIPEOUT_RENDERER_PIZZA
+	bool "Q16 RGB565 PiZZa renderer (in development)"
+	help
+	  render_software_pizza.c -- Q16 fixed-point inner loop, RGB565
+	  framebuffer, split RGBA5551 + RGBA4444 atlases, edge-function
+	  rasteriser with five specialised fast paths. Targets ~3-5x
+	  speedup over the SMP renderer on rpi_zero_2w.
+
+	  Currently scaffolding only; enabling this option builds and
+	  links but renders a black screen. See
+	  notes/wipeout_pizza_renderer_spec.md for the phased plan.
+
+endchoice
+
+config WIPEOUT_USE_QPU_TRANSFORM
+	bool "Use V3D QPU for vec3_transform_perspective (EMPIRICALLY SLOWER)"
+	default n
+	depends on WIPEOUT_RENDERER_SMP
+	select BCM2835_V3D
+	help
+	  Offload the per-frame vec3_transform_perspective vertex math
+	  from the A53 onto the BCM2710 V3D QPUs.
+
+	  *** EMPIRICALLY NET-NEGATIVE -- DEFAULT OFF FOR A REASON ***
+
+	  Standalone the QPU is ~9x faster per vertex than scalar
+	  (48 ns vs 445 ns; see samples/drivers/bcm2835_v3d/vec3_xform).
+	  But wipeout's renderer hands tris in 3-vert chunks, forcing
+	  per-tri staging into V3D coherent memory + per-flush scatter/
+	  gather. Measured via `wipeout bench all` (2026-06-09 on
+	  rpi_zero_2w, NUM_QPUS=12, Normal-NC mapping + DSB barriers,
+	  fused scatter, MIN_TRIS_FOR_KICK=64):
+
+	    config                  scalar   QPU      delta
+	    parallel-4  1000t / 1m   5753us  9205us   1.60x slower
+	    parallel-4  3000t / 3m  14127us 24578us   1.74x slower
+	    parallel-4  5000t / 3m  22589us 40088us   1.77x slower
+	    parallel-4  7000t / 3m  30981us 55456us   1.79x slower
+
+	  Per-tri the QPU integration costs ~3.5 us of staging +
+	  finalize + scatter/gather overhead, displacing only ~1.3 us
+	  of scalar transform (3 verts * 445 ns). The arithmetic does
+	  not work out at this batching granularity -- no incremental
+	  fix (drop AoS staging ~500 us/frame, bucket-on-stage
+	  ~100 us/frame) closes the multi-millisecond gap.
+
+	  Where the QPU genuinely wins on this silicon: single big-
+	  batch kernels in the thousands+ of items (FFT, image filters,
+	  small-model inference). Per-frame vertex transform in a
+	  3-vert-at-a-time renderer is the wrong shape.
+
+	  Enable only for code-path experimentation; the renderer falls
+	  back to scalar for batches smaller than 64 triangles and on
+	  QPU failure, so output is always correct (~16 ULP from
+	  scalar, sub-pixel on a 240p framebuffer). The performance
+	  cost is real and visible.
+
 source "Kconfig.zephyr"
