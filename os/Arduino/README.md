@@ -101,7 +101,7 @@ back up it auto-loads the new sketch. No card swap, no manual re-flash.
 ## What works
 
 **GPIO, SPI, Wire (I²C), Serial** (USB-CDC; mini-UART as `Serial1`), and **WiFi**
-(the `WiFi` library / brcmfmac — `WiFiWebClient` connects and does HTTPS).
+(the `WiFi` library / brcmfmac — `WiFiWebClient` connects and does HTTP).
 
 Not available yet: **ADC / `analogRead`**, **PWM / `analogWrite`**. Libraries with
 no driver wired in the variant overlay aren't shipped (Camera, Storage, SDRAM,
