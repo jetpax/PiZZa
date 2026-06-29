@@ -46,7 +46,6 @@ over USB-CDC, so nothing else is needed.
 
 ## Status
 
-⚠️ **Not yet hardware-confirmed.** The image is assembled from the canonical Pi
-boot blobs + the proven `config.txt`/loader, but a fresh-image boot hasn't been
-verified on hardware yet — flash it and check the mini-UART (115200) shows the
-loader banner. Report back and this note comes off.
+✅ **Hardware-confirmed 2026-06-29.** Flashed straight from Raspberry Pi Imager
+(**Use custom**), boots the loader, and a WiFi sketch (WiFiWebClient) uploads over
+USB-CDC and runs (Wi-Fi join + HTTP 200). One flash, no Raspberry Pi OS step.
