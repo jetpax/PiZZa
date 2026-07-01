@@ -13,7 +13,7 @@ one-time setup, **Upload is one button: no SD swap, no manual re-flash.**
 ## Which Pi do you have?
 
 | Board | Silicon | Bits | Board menu entry |
-|---|---|---|---|---|
+|---|---|---|---|
 | **Pi Zero 2 W** (quad-core, 2021+) | BCM2710 / Cortex-A53 | 64-bit | **PiZZa (Raspberry Pi Zero 2 W)** |
 | **Pi Zero W** (single-core, 2017) | BCM2835 / ARM1176 | 32-bit | **PiZZa (Raspberry Pi Zero W)** ⏳ WiFi is WIP|
 
