@@ -10,26 +10,34 @@
       },
       "platforms": [
         {
-          "name": "PiZZA Boards (Arduino on Zephyr)",
+          "name": "PiZZa Boards (Arduino on Zephyr)",
           "architecture": "zephyr",
-          "version": "0.3.2",
+          "version": "0.4.0",
           "category": "Contributed",
           "help": {
             "online": "https://github.com/jetpax/PiZZa#readme"
           },
-          "url": "https://github.com/jetpax/PiZZa/releases/download/arduino-core-v0.3.2/ArduinoCore-pizza-0.3.2.tar.bz2",
-          "archiveFileName": "ArduinoCore-pizza-0.3.2.tar.bz2",
-          "checksum": "SHA-256:ba2c4bf104ed7f419e3638880d02bb7d3d0d47d876f7ac6f1eb85acffcd3e3f5",
-          "size": "5397011",
+          "url": "https://github.com/jetpax/PiZZa/releases/download/arduino-core-v0.4.0/ArduinoCore-pizza-0.4.0.tar.bz2",
+          "archiveFileName": "ArduinoCore-pizza-0.4.0.tar.bz2",
+          "checksum": "SHA-256:32f76d0814a279fd0f4076169cf1d9e30f7ecc19c87653f297dfb435a7c720c3",
+          "size": "8853474",
           "boards": [
             {
-              "name": "PiZZA (Raspberry Pi Zero 2 W)"
+              "name": "PiZZa (Raspberry Pi Zero 2 W)"
+            },
+            {
+              "name": "PiZZa (Raspberry Pi Zero W)"
             }
           ],
           "toolsDependencies": [
             {
               "packager": "pizza",
               "name": "aarch64-zephyr-elf",
+              "version": "1.0.1"
+            },
+            {
+              "packager": "pizza",
+              "name": "arm-zephyr-eabi",
               "version": "1.0.1"
             },
             {
@@ -72,6 +80,40 @@
               "archiveFileName": "toolchain_gnu_windows-x86_64_aarch64-zephyr-elf.7z",
               "checksum": "SHA-256:17ebc57dc47bf75f8f08b429cc1c72ff5ca5c917bda1d582048cd9b399cb7579",
               "size": "59795459"
+            }
+          ]
+        },
+        {
+          "name": "arm-zephyr-eabi",
+          "version": "1.0.1",
+          "systems": [
+            {
+              "host": "arm64-apple-darwin",
+              "url": "https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v1.0.1/toolchain_gnu_macos-aarch64_arm-zephyr-eabi.tar.xz",
+              "archiveFileName": "toolchain_gnu_macos-aarch64_arm-zephyr-eabi.tar.xz",
+              "checksum": "SHA-256:4008edb5d4840cd994aedd7f1309bfb63e7243729d57839ebf1cc83c1f17c886",
+              "size": "89958448"
+            },
+            {
+              "host": "x86_64-pc-linux-gnu",
+              "url": "https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v1.0.1/toolchain_gnu_linux-x86_64_arm-zephyr-eabi.tar.xz",
+              "archiveFileName": "toolchain_gnu_linux-x86_64_arm-zephyr-eabi.tar.xz",
+              "checksum": "SHA-256:21b85981cb5a1818d9bc53d82af80f208946ec038b982ff1907287572ed3a634",
+              "size": "101752776"
+            },
+            {
+              "host": "aarch64-pc-linux-gnu",
+              "url": "https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v1.0.1/toolchain_gnu_linux-aarch64_arm-zephyr-eabi.tar.xz",
+              "archiveFileName": "toolchain_gnu_linux-aarch64_arm-zephyr-eabi.tar.xz",
+              "checksum": "SHA-256:b9805b691f2f0a8926c92694cae378d05ba07b76abca745e216fcc52753cc4d6",
+              "size": "97253908"
+            },
+            {
+              "host": "x86_64-mingw32",
+              "url": "https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v1.0.1/toolchain_gnu_windows-x86_64_arm-zephyr-eabi.7z",
+              "archiveFileName": "toolchain_gnu_windows-x86_64_arm-zephyr-eabi.7z",
+              "checksum": "SHA-256:d08df2e83378dc8d28d0c67ab72d021ca633344b7a2bc053ababf9b8e677aa8d",
+              "size": "79217349"
             }
           ]
         },
