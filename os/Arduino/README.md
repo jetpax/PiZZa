@@ -15,7 +15,7 @@ one-time setup, **Upload is one button: no SD swap, no manual re-flash.**
 | Board | Silicon | Bits | Board menu entry |
 |---|---|---|---|
 | **Pi Zero 2 W** (quad-core, 2021+) | BCM2710 / Cortex-A53 | 64-bit | **PiZZa (Raspberry Pi Zero 2 W)** |
-| **Pi Zero W** (single-core, 2017) | BCM2835 / ARM1176 | 32-bit | **PiZZa (Raspberry Pi Zero W)** ⏳ WiFi is WIP|
+| **Pi Zero W** (single-core, 2017) | BCM2835 / ARM1176 | 32-bit | **PiZZa (Raspberry Pi Zero W)** |
 
 
 
@@ -43,10 +43,10 @@ one-time setup, **Upload is one button: no SD swap, no manual re-flash.**
 ## Step 2 — Flash the loader to the SD card (one time)
 
 1. Download the ready-to-flash loader image for your board:
-   - **Pi Zero 2 W:** [pizza-loader-rpi_zero_2w-v0.4.0.img.xz](https://github.com/jetpax/PiZZa/releases/download/arduino-loader-v0.4.0/pizza-loader-rpi_zero_2w-v0.4.0.img.xz)
-   - **Pi Zero W (original):** [pizza-loader-rpi_zero_w-v0.4.0.img.xz](https://github.com/jetpax/PiZZa/releases/download/arduino-loader-v0.4.0/pizza-loader-rpi_zero_w-v0.4.0.img.xz)
+   - **Pi Zero 2 W:** [pizza-loader-rpi_zero_2w-v0.5.0.img.xz](https://github.com/jetpax/PiZZa/releases/download/arduino-loader-v0.5.0/pizza-loader-rpi_zero_2w-v0.5.0.img.xz)
+   - **Pi Zero W (original):** [pizza-loader-rpi_zero_w-v0.5.0.img.xz](https://github.com/jetpax/PiZZa/releases/download/arduino-loader-v0.5.0/pizza-loader-rpi_zero_w-v0.5.0.img.xz)
 
-   Both are ~2 MB; SHAs on the [release page](https://github.com/jetpax/PiZZa/releases/tag/arduino-loader-v0.4.0).
+   Both are ~2 MB; SHAs on the [release page](https://github.com/jetpax/PiZZa/releases/tag/arduino-loader-v0.5.0).
 2. Flash with **Raspberry Pi Imager** (*Choose OS → Use custom* → pick the
    `.img.xz`) or balenaEtcher — both read `.img.xz` directly, no unzip needed.
 3. Put the card in the Pi.
@@ -88,10 +88,8 @@ back up it auto-loads the new sketch. No card swap, no manual re-flash.
 **Pi Zero 2 W:** GPIO, SPI, Wire (I²C), Serial (USB-CDC; mini-UART as `Serial1`),
 and **WiFi** (the `WiFi` library / brcmfmac).
 
-**Pi Zero W (original):** GPIO, Serial (USB-CDC; mini-UART as `Serial1`). SPI /
-Wire / WiFi are pending — the BCM283x driver family is already ported for the
-2 W and re-basing to BCM2835 is mostly mechanical, but each takes a bring-up
-cycle.
+**Pi Zero W (original):** GPIO, Serial (USB-CDC; mini-UART as `Serial1`), and
+**WiFi** (new in 0.5.0 — same `WiFi` library / brcmfmac driver as the 2 W).
 
 - Not available on either yet: **PWM / `analogWrite`**.
 - Not supported due to hardware limitation: **`analogRead()`** (no on-chip ADC,
