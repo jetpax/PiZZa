@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# PiZZa SDLPoP port -- app options. The backend choices are the §5
+# seams: stubs today, real backends drop in via these switches with
+# no game or shim changes.
+
+# SAMPLE_USBD_* options for sample_usbd_init.c on boards with the USB
+# device stack. Same pattern PizzaShell / Jet / wipeout use.
+source "samples/subsys/usb/common/Kconfig.sample_usbd"
+
+menu "PiZZa SDLPoP port"
+
+choice SDLPOP_PRESENT_BACKEND
+	prompt "Frame present backend"
+	default SDLPOP_PRESENT_DISPLAY if DISPLAY
+	default SDLPOP_PRESENT_NONE
+
+config SDLPOP_PRESENT_DISPLAY
+	bool "Zephyr display API (bcm2835_fb + HVS scaling on hardware)"
+	depends on DISPLAY
+
+config SDLPOP_PRESENT_NONE
+	bool "Drop frames (link/sim bring-up)"
+
+config SDLPOP_PRESENT_SEMIHOST
+	bool "Semihosting PPM capture (qemu sim gates)"
+	depends on SEMIHOST
+
+endchoice
+
+config SDLPOP_CAPTURE_EVERY
+	int "Capture every Nth presented frame (0 = first frame only)"
+	depends on SDLPOP_PRESENT_SEMIHOST
+	default 0
+
+config SDLPOP_VIDEO_SELFTEST
+	bool "Present color bars through the shim video path before the game starts"
+	default n
+
+config SDLPOP_SELFTEST_HOLD_MS
+	int "How long to hold the selftest color bars on the panel (ms)"
+	depends on SDLPOP_VIDEO_SELFTEST
+	default 5000
+	help
+	  On hardware this is the window to eyeball the present path and R/B
+	  channel order. Set 0-ish once signed off, or disable the selftest.
+
+config SDLPOP_SCRIPTED_INPUT
+	bool "Drive the game from a scripted synthetic input source (§5b seam)"
+	default n
+
+config SDLPOP_SIM_TUNING
+	bool "Pack the sim-only tuning ini (fades off) to reach gameplay fast under TCG"
+	default n
+
+choice SDLPOP_AUDIO_BACKEND
+	prompt "Audio backend (work-order §5a seam)"
+	default SDLPOP_AUDIO_NONE
+
+config SDLPOP_AUDIO_NONE
+	bool "None -- SDL_OpenAudio fails, game disables audio"
+
+endchoice
+
+module = SDLPOP
+module-str = sdlpop
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu
+
+source "Kconfig.zephyr"
