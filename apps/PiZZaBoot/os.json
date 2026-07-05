@@ -1,0 +1,12 @@
+{
+    "name": "PiZZaBoot",
+    "version": "0.1.0",
+    "release_date": "2026-05-27",
+    "description": "PiZZa boot manager. Tiny Zephyr image that chainboots one of the installed PiZZa OSes (ScriptoStudio in v1; PiZZa-shell and Linux are roadmap).",
+    "supported_models": [
+        "Pi Zero 2"
+    ],
+    "bootable": true,
+    "supports_backup": "false",
+    "url": "https://github.com/jetpax/PiZZa"
+}

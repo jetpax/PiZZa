@@ -1,0 +1,19 @@
+{
+    "partitions": [
+        {
+            "label": "scriptostudio",
+            "filesystem_type": "FAT",
+            "partition_size_nominal": 256,
+            "uncompressed_tarball_size": 64,
+            "requires_partition_number": 7
+        },
+        {
+            "label": "scriptostudio_sd",
+            "filesystem_type": "FAT",
+            "partition_size_nominal": 1024,
+            "want_maximised": true,
+            "empty_fs": true,
+            "requires_partition_number": 8
+        }
+    ]
+}

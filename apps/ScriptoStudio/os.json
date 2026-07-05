@@ -1,0 +1,12 @@
+{
+    "name": "ScriptoStudio",
+    "version": "0.1.0",
+    "release_date": "2026-05-27",
+    "description": "ScriptoStudio: full-fat pyDirect MicroPython on Zephyr (ulab + WebREPL Binary Protocol + HTTP server). Boots into the MicroPython REPL over USB-CDC; web UI on the Wi-Fi network. PFC agent state persists on /sd (separate partition).",
+    "supported_models": [
+        "Pi Zero 2"
+    ],
+    "bootable": true,
+    "supports_backup": "false",
+    "url": "https://github.com/jetpax/PiZZa"
+}
