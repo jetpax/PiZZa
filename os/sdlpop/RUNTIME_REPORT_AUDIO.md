@@ -84,7 +84,14 @@ ALL PASS
 Tone image flashed by the user; **1 kHz sine audible over HDMI on
 first boot** — the full source→resample→pack→DMA(DREQ 17)→MAI path
 works on silicon, including the first-ever DREQ-paced use of
-`dma_bcm2835.c` (M1 hardware evidence). Boot log:
+`dma_bcm2835.c` (M1 hardware evidence). Display: **Dell U2520D**
+(UltraSharp 25" QHD monitor, audio via its 3.5 mm line-out — no
+built-in speakers). Note this is a *monitor*, not a TV: R2 warned
+displays can mute HDMI audio silently, but this one accepts and
+routes it, so the R2 risk did not materialize here. Firmware
+negotiated 1080p (pixel clock 148.5 MHz), not the panel's native
+QHD — irrelevant to audio, which only depends on the audio clock
+regen. Boot log:
 
 ```
 bcm2835_fb: DMA blit on dma@3f007000 channel 4
@@ -122,8 +129,9 @@ silently even in HDMI mode, so sign off on a TV and name it).
 
 **M2 checklist (tone image):**
 1. ~~Boot + `MAI up` line~~ **DONE 2026-07-05** (log above).
-2. ~~1 kHz tone audible~~ **DONE 2026-07-05** — display model still
-   to be named for the record (1080p HDMI, pixel clock 148.5 MHz).
+2. ~~1 kHz tone audible~~ **DONE 2026-07-05** — Dell U2520D monitor,
+   audio out via its 3.5 mm line-out (1080p HDMI, pixel clock
+   148.5 MHz).
 3. `pop audio` over USB CDC ACM: `blocks played` advancing ~250/s,
    `underruns 0`, `dma errors 0`, DMA `LEN` cycling 0..1536, MAI CTL
    without ERROR bits.
