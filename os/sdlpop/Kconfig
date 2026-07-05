@@ -53,6 +53,21 @@ config SDLPOP_SIM_TUNING
 	bool "Pack the sim-only tuning ini (fades off) to reach gameplay fast under TCG"
 	default n
 
+config SDLPOP_SKIP_INFO_SCREEN
+	bool "Skip the SDLPoP info/splash screen (boot straight to the original intro)"
+	default y
+	help
+	  SDLPoP inserts its own "SDLPoP <version> ... Press any key to
+	  continue" info screen (seg000.c show_splash) before the game's
+	  original title sequence. This port has no user-editable
+	  SDLPoP.ini to act on and no keyboard at boot, so that screen
+	  only blocks the original Broderbund/title intro and its theme.
+	  Packing a one-line SDLPoP.ini with enable_info_screen = false
+	  into the asset pack disables it -- boot goes straight to the
+	  original splash/intro. The sim build (SDLPOP_SIM_TUNING) already
+	  bypasses show_splash via its start-level arg, so this option is
+	  ignored there.
+
 choice SDLPOP_AUDIO_BACKEND
 	prompt "Audio backend (work-order §5a seam)"
 	default SDLPOP_AUDIO_NONE

@@ -115,11 +115,22 @@ game callback → resample → IEC958 pack → DMA → MAI. The digi SFX and
 the OPL3/MIDI music ride the identical transport, so this closes the
 M3 acoustic check for game audio.
 
-**Default game image plays the intro theme.** The shipped
-`build-sdlpop` config boots the normal Broderbund/title sequence,
-whose `show_title()` auto-plays `sound_54_intro_music` (the main
-theme, OPL3 from the packed MIDISND DATs) with no input — the
-simplest way to hear music on boot.
+**Intro theme (OPL3 music path) — CONFIRMED 2026-07-05.** The shipped
+`build-sdlpop` config boots straight to the game's original
+Broderbund/title sequence, whose `show_title()` auto-plays
+`sound_54_intro_music` (the main theme, OPL3 synthesized from the
+packed MIDISND DATs) with no input — and it is **audible on the
+display**. Together with the footstep pass above, both of SDLPoP's
+audio paths (digitized SFX and OPL3/MIDI music) are now
+hardware-verified through the HDMI backend.
+
+To reach the original intro, the shipped image suppresses SDLPoP's
+own added info screen (`show_splash`, "SDLPoP <version> … Press any
+key to continue"), which otherwise gates the intro on a keypress this
+port has no boot-time input for. `CONFIG_SDLPOP_SKIP_INFO_SCREEN`
+(default y) packs a one-line `SDLPoP.ini` (`enable_info_screen =
+false`) into the asset pack — the game's own supported option, game
+tree untouched.
 
 ## 🔴 REMAINING HARDWARE SIGN-OFF
 

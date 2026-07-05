@@ -140,10 +140,18 @@ set(POP_PACK_BIN ${CMAKE_BINARY_DIR}/sdlpop_assets.bin)
 file(GLOB_RECURSE POP_DATA_FILES ${POP_DATA_DIR}/*)
 set(POP_PACK_OVERLAY_ARGS "")
 set(POP_PACK_OVERLAY_DEPS "")
+# A single SDLPoP.ini overlay is packed at the pack root. The sim's
+# tuning ini (fades/music off, reach gameplay fast under TCG) takes
+# precedence; otherwise the hardware ini disables the SDLPoP info
+# screen so boot lands on the original intro.
 if(CONFIG_SDLPOP_SIM_TUNING)
-  # Sim-only: pack the tuning ini at pack root (hardware ships none).
-  file(GLOB_RECURSE POP_OVERLAY_FILES ${CMAKE_CURRENT_SOURCE_DIR}/sim_overlay/*)
-  set(POP_PACK_OVERLAY_ARGS --overlay ${CMAKE_CURRENT_SOURCE_DIR}/sim_overlay)
+  set(POP_OVERLAY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/sim_overlay)
+elseif(CONFIG_SDLPOP_SKIP_INFO_SCREEN)
+  set(POP_OVERLAY_DIR ${CMAKE_CURRENT_SOURCE_DIR}/hw_overlay)
+endif()
+if(DEFINED POP_OVERLAY_DIR)
+  file(GLOB_RECURSE POP_OVERLAY_FILES ${POP_OVERLAY_DIR}/*)
+  set(POP_PACK_OVERLAY_ARGS --overlay ${POP_OVERLAY_DIR})
   set(POP_PACK_OVERLAY_DEPS ${POP_OVERLAY_FILES})
 endif()
 add_custom_command(
