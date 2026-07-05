@@ -106,16 +106,32 @@ default), pixel 148.5 MHz (1080p), CTS = pixel/1000, SMP 228474/67 ≈
 The game image's `init_digi` correctly reports "already open (test
 tone)" while the tone owns the path.
 
+**M3 in-game audio — CONFIRMED 2026-07-05.** A game image booting
+straight into level 1 with the Prince auto-paced (footstep + landing
+sounds, no input device needed) produced **continuous audible in-game
+audio** over the same HDMI path. This exercises the real
+`audio_callback` mix (SDLPoP's digitized-sound path) end to end:
+game callback → resample → IEC958 pack → DMA → MAI. The digi SFX and
+the OPL3/MIDI music ride the identical transport, so this closes the
+M3 acoustic check for game audio.
+
+**Default game image plays the intro theme.** The shipped
+`build-sdlpop` config boots the normal Broderbund/title sequence,
+whose `show_title()` auto-plays `sound_54_intro_music` (the main
+theme, OPL3 from the packed MIDISND DATs) with no input — the
+simplest way to hear music on boot.
+
 ## 🔴 REMAINING HARDWARE SIGN-OFF
 
-Still open (the CDC ACM shell didn't come up in the first session —
-known boot-order behavior, see known issues — so the `pop audio`
-counter checks are pending):
+Audio is now proven acoustically both as the M2 tone and as M3 in-game
+sound. What remains needs the CDC ACM shell, which didn't come up in
+the hardware sessions (known boot-order behavior, see known issues),
+so these are quantitative/diagnostic rather than "does it work":
 
 | Image | Path | What it does |
 |-------|------|--------------|
 | M2 test tone | `~/zephyrproject/build-sdlpop-tone/zephyr/zephyr.bin` | boots into a continuous 1 kHz −12 dBFS tone through the **full** source→resample→pack→DMA→MAI path |
-| M3 game | `~/zephyrproject/build-sdlpop/zephyr/zephyr.bin` | SDLPoP with the HDMI backend; game opens audio, OPL3 music + digi SFX |
+| M3 game | `~/zephyrproject/build-sdlpop/zephyr/zephyr.bin` | SDLPoP with the HDMI backend; boots the intro theme, then in-game digi SFX + OPL3 music |
 
 Flash (user-driven, same flow as the SDLPoP port):
 ```sh
@@ -145,13 +161,14 @@ silently even in HDMI mode, so sign off on a TV and name it).
    hardware evidence).
 
 **M3 checklist (game image):**
-1. Boot; console shows `HDMI audio open: 48 kHz stereo, 8 x 1536 B
-   ring, DMA ch <n>` when the game starts (init_digi succeeds; the
-   guard `init_digi: SDL_OpenAudio` error line must NOT appear).
-2. Intro/title music (OPL3 via MIDISND DATs) audible; in level 1,
-   digi SFX (footsteps, gate, sword) audible over music.
+1. ~~Boot; `HDMI audio open` (init_digi succeeds, no `no backend`)~~
+   **DONE 2026-07-05** (log above).
+2. ~~In-game audio audible~~ **DONE 2026-07-05** — footsteps + landing
+   sounds continuous via the auto-pace image. Intro theme via the
+   default image is the music-path counterpart (same transport).
 3. `pop audio` during gameplay: underruns 0 (or note the count —
    the feeder runs cooperative-priority above the render loop).
+   Pending on the CDC shell.
 
 ---
 
