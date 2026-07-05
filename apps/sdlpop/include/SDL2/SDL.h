@@ -11,7 +11,7 @@
  * (USB-HID scancode values, event type numbers), and are otherwise
  * internal to this shim.
  *
- * Implementations live in os/sdlpop/src/shim_*.c, backed by Zephyr
+ * Implementations live in apps/sdlpop/src/shim_*.c, backed by Zephyr
  * (k_uptime/k_timer, the bcm2835_fb present path, fs_*).
  */
 

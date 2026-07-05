@@ -13,7 +13,7 @@ driver with VideoCore HVS hardware scaling.
 ## Layout
 
 ```
-os/sdlpop/
+apps/sdlpop/
 ├── CMakeLists.txt          links ~/github/SDLPoP/src (untouched) + shim
 ├── Kconfig / prj.conf      present + audio backend seams
 ├── boards/
@@ -62,14 +62,14 @@ Toolchain stanza is the invariant PiZZa one (see the wipeout recipe).
 cd ~/zephyrproject && source ~/.zephyr-venv/bin/activate
 ZEPHYR_TOOLCHAIN_VARIANT=cross-compile \
 CROSS_COMPILE=$HOME/zephyr-sdk/aarch64-zephyr-elf/bin/aarch64-zephyr-elf- \
-west build -p always -b rpi_zero_2w -s ~/github/SS/PiZZa/os/sdlpop -d build-sdlpop
+west build -p always -b rpi_zero_2w -s ~/github/SS/PiZZa/apps/sdlpop -d build-sdlpop
 ```
 
 **Sim (qemu_cortex_a53) — the sim-verified gates:**
 ```sh
 ZEPHYR_TOOLCHAIN_VARIANT=cross-compile \
 CROSS_COMPILE=$HOME/zephyr-sdk/aarch64-zephyr-elf/bin/aarch64-zephyr-elf- \
-west build -p always -b qemu_cortex_a53 -s ~/github/SS/PiZZa/os/sdlpop -d build-sdlpop-qemu
+west build -p always -b qemu_cortex_a53 -s ~/github/SS/PiZZa/apps/sdlpop -d build-sdlpop-qemu
 west build -d build-sdlpop-qemu -t run     # writes sdlpop_frame_*.ppm
 ```
 

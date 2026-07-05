@@ -15,11 +15,11 @@ binaries and `.../loader-image/make-image*.sh` wraps each into an SD image.
 
 ```sh
 # Zero 2 W
-cd PiZZa/os/Arduino && ./dist-build.sh                   # -> firmwares/zephyr-rpi_zero_2w_bcm2710.bin
+cd PiZZa/apps/Arduino && ./dist-build.sh                   # -> firmwares/zephyr-rpi_zero_2w_bcm2710.bin
 cd loader-image && ./make-image.sh                       # -> pizza-loader-rpi_zero_2w.img
 
 # Original Zero W
-cd PiZZa/os/Arduino && ./dist-build.sh                   # -> firmwares/zephyr-rpi_zero_w_bcm2835.bin
+cd PiZZa/apps/Arduino && ./dist-build.sh                   # -> firmwares/zephyr-rpi_zero_w_bcm2835.bin
 cd loader-image && ./make-image-rpi-zero-w.sh            # -> pizza-loader-rpi_zero_w.img
 ```
 

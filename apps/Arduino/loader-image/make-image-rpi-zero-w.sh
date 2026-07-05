@@ -35,7 +35,7 @@ export OUT="pizza-loader-rpi_zero_w.img"
 ZEPHYR_BIN="${1:-${HERE}/../../../../ArduinoCore-zephyr/firmwares/zephyr-rpi_zero_w_bcm2835.bin}"
 if [ ! -f "${ZEPHYR_BIN}" ]; then
 	echo "error: loader not found: ${ZEPHYR_BIN}" >&2
-	echo "       run PiZZa/os/Arduino/dist-build.sh first, or pass the path." >&2
+	echo "       run PiZZa/apps/Arduino/dist-build.sh first, or pass the path." >&2
 	exit 1
 fi
 cp "${ZEPHYR_BIN}" "${HERE}/zephyr.bin"

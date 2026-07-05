@@ -37,7 +37,7 @@ EXTRA_ZEPHYR_MODULES="${HAL_BROADCOM};${ACZ}" \
 	-s "${ACZ}/loader" \
 	-- -DTOOLCHAIN_HAS_GLIBCXX=ON
 
-echo "==> Building reference sketch (os/Arduino/sketch -> sketch.llext)"
+echo "==> Building reference sketch (apps/Arduino/sketch -> sketch.llext)"
 "${WEST}" build -p always -b rpi_zero_2w \
 	-d "${SKETCH_BUILD}" \
 	"${HERE}/sketch"

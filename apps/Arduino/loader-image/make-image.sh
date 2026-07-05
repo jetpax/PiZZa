@@ -16,7 +16,7 @@
 # Usage:
 #   ./make-image.sh [path-to-zephyr.bin]
 # Default loader: ../../../ArduinoCore-zephyr/firmwares/zephyr-rpi_zero_2w_bcm2710.bin
-# (run PiZZa/os/Arduino/dist-build.sh first to produce it).
+# (run PiZZa/apps/Arduino/dist-build.sh first to produce it).
 
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -29,7 +29,7 @@ export OUT="pizza-loader-rpi_zero_2w.img"
 ZEPHYR_BIN="${1:-${HERE}/../../../../ArduinoCore-zephyr/firmwares/zephyr-rpi_zero_2w_bcm2710.bin}"
 if [ ! -f "${ZEPHYR_BIN}" ]; then
 	echo "error: loader not found: ${ZEPHYR_BIN}" >&2
-	echo "       run PiZZa/os/Arduino/dist-build.sh first, or pass the path." >&2
+	echo "       run PiZZa/apps/Arduino/dist-build.sh first, or pass the path." >&2
 	exit 1
 fi
 cp "${ZEPHYR_BIN}" "${HERE}/zephyr.bin"
