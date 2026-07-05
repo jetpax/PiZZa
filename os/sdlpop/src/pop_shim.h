@@ -87,6 +87,26 @@ void pop_audio_lock(void);
 void pop_audio_unlock(void);
 SDL_AudioStatus pop_audio_status(void);
 
+#ifdef CONFIG_SDLPOP_AUDIO_HDMI
+/* Diagnostics for the `pop audio` shell command (shim_shell.c). */
+struct pop_audio_hdmi_stats {
+	int opened;
+	int tone_mode;
+	int paused;
+	int dma_chan;
+	unsigned int blocks_played;
+	unsigned int underruns;
+	unsigned int dma_errors;
+};
+
+void pop_audio_hdmi_get_stats(struct pop_audio_hdmi_stats *out);
+
+/* Skip the next N feeder wakeups (one per 4 ms block) to starve the
+ * ring on demand -- the M2 underrun-recovery demonstration.
+ */
+void pop_audio_hdmi_starve(unsigned int blocks);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

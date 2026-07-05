@@ -87,6 +87,13 @@ enable_uart=1
 core_freq=250
 kernel_address=0x200000
 kernel=zephyr.bin
+
+# Bring HDMI up at boot even with no monitor attached at power-on.
+hdmi_force_hotplug=1
+
+# Force HDMI mode (not DVI): DVI carries no audio packets. Required
+# for HDMI audio.
+hdmi_drive=2
 EOF
 
 echo "Installed $(basename "$ZEPHYR_BIN") to $MOUNT."

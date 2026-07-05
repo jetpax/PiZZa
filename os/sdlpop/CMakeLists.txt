@@ -88,6 +88,17 @@ set(POP_SHIM_SRC
 
 if(CONFIG_SDLPOP_AUDIO_NONE)
   list(APPEND POP_SHIM_SRC src/shim_audio_none.c)
+elseif(CONFIG_SDLPOP_AUDIO_HDMI)
+  # HDMI-audio work order §2: freestanding core (host-tested by
+  # tests/audio_host) + MAI hardware programming + Zephyr glue.
+  list(APPEND POP_SHIM_SRC
+    src/shim_audio_hdmi.c
+    src/audio/iec958_pack.c
+    src/audio/resample_48k.c
+    src/audio/ring.c
+    src/audio/audio_pump.c
+    src/audio/hdmi_audio_init.c
+  )
 endif()
 
 # `pop` shell command set -- interactive key injection over the USB

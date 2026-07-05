@@ -166,12 +166,88 @@ static int cmd_keys(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+#ifdef CONFIG_SDLPOP_AUDIO_HDMI
+
+#include <zephyr/drivers/dma/dma_bcm2835.h>
+#include "audio/hdmi_audio.h"
+
+/* HDMI-audio bring-up diagnostics (work order M2): pump/ring
+ * counters, live MAI state, recovered clocks, and the raw DMA
+ * channel registers -- everything needed to localize a silent-TV
+ * fault to feed vs pacing vs MAI vs regen without guessing.
+ */
+static int cmd_audio(const struct shell *sh, size_t argc, char **argv)
+{
+	struct pop_audio_hdmi_stats stats;
+	struct hdmi_audio_hw_debug dbg;
+
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	pop_audio_hdmi_get_stats(&stats);
+	shell_print(sh, "state: %s%s%s  dma ch %d",
+		    stats.opened ? "open" : "closed",
+		    stats.tone_mode ? " [test tone]" : "",
+		    stats.opened ? (stats.paused ? " paused" : " playing") : "",
+		    stats.dma_chan);
+	shell_print(sh, "blocks played %u (%u ms), underruns %u, dma errors %u",
+		    stats.blocks_played, stats.blocks_played * 4,
+		    stats.underruns, stats.dma_errors);
+
+	hdmi_audio_hw_get_debug(&dbg);
+	shell_print(sh, "clocks: hsm %u Hz, pixel %u Hz", dbg.hsm_hz,
+		    dbg.pixel_hz);
+	shell_print(sh, "MAI: SMP %u/%u  N %u  CTS %u  CTL %08x",
+		    dbg.smp_n, dbg.smp_m, dbg.crp_n, dbg.cts, dbg.mai_ctl);
+
+	if (stats.dma_chan >= 0) {
+		const struct device *dma =
+			DEVICE_DT_GET(DT_NODELABEL(dma));
+		struct dma_bcm2835_chan_state cs;
+
+		if (dma_bcm2835_get_chan_state(dma, (uint32_t)stats.dma_chan,
+					       &cs) == 0) {
+			shell_print(sh, "DMA: CS %08x CONBLK %08x TI %08x",
+				    cs.cs, cs.conblk_ad, cs.ti);
+			shell_print(sh, "     SRC %08x DST %08x LEN %u DEBUG %08x",
+				    cs.source_ad, cs.dest_ad, cs.txfr_len,
+				    cs.debug);
+		}
+	}
+
+	return 0;
+}
+
+static int cmd_audio_starve(const struct shell *sh, size_t argc, char **argv)
+{
+	int blocks = atoi(argv[1]);
+
+	ARG_UNUSED(argc);
+	if (blocks <= 0 || blocks > 1000) {
+		shell_print(sh, "blocks must be 1..1000");
+		return -EINVAL;
+	}
+
+	pop_audio_hdmi_starve((unsigned int)blocks);
+	shell_print(sh, "starving feeder for %d blocks (%d ms) -- expect "
+		    "~%d underruns, then recovery; check `pop audio`",
+		    blocks, blocks * 4, blocks > 7 ? blocks - 7 : 0);
+	return 0;
+}
+
+#endif /* CONFIG_SDLPOP_AUDIO_HDMI */
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_pop,
 	SHELL_CMD_ARG(key,  NULL, "<name>  -- tap (down+up), e.g. `pop key enter`", cmd_key, 2, 0),
 	SHELL_CMD_ARG(down, NULL, "<name>  -- press and hold",  cmd_down, 2, 0),
 	SHELL_CMD_ARG(up,   NULL, "<name>  -- release a held key", cmd_up, 2, 0),
 	SHELL_CMD_ARG(tap,  NULL, "<name> [ms]  -- hold then release (default 250 ms)", cmd_tap, 2, 1),
 	SHELL_CMD(keys,     NULL, "list key names", cmd_keys),
+#ifdef CONFIG_SDLPOP_AUDIO_HDMI
+	SHELL_CMD(audio,    NULL, "HDMI audio path diagnostics", cmd_audio),
+	SHELL_CMD_ARG(starve, NULL, "<blocks>  -- starve the audio ring (underrun demo)",
+		      cmd_audio_starve, 2, 0),
+#endif
 	SHELL_SUBCMD_SET_END
 );
 

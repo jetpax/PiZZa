@@ -88,12 +88,13 @@ present path is signed off — re-enable it for any future display bring-up.
 
 ## Deferred scope (§5) — designed-for, not built
 
-- **Audio (§5a):** `SDL_OpenAudio` fails through the `pop_audio_*` seam
-  (`shim_audio_none.c`), so SDLPoP sets `digi_unavailable` and disables
-  its whole audio path cleanly. Real I2S backend is a Kconfig-selected
-  drop-in (`shim_audio_i2s.c`) — no game or shim change. HDMI-audio
-  feasibility stays a bounded investigation (expected answer: no, use I2S
-  + external DAC).
+- **Audio (§5a): no longer deferred.** The HDMI-audio work order
+  landed `shim_audio_hdmi.c` as the real Kconfig-selected backend
+  behind this exact seam (no game or shim change, as designed) — see
+  `RUNTIME_REPORT_AUDIO.md`. The original "expected answer: no, use
+  I2S + external DAC" was overturned: direct MAI programming works
+  without VCHIQ. `shim_audio_none.c` remains the default for boards
+  without the HDMI path (qemu sim).
 - **Controls (§5b):** joystick/controller/haptic uniformly "none
   present" (bucket D). `shim_event.c` accepts any producer. On hardware
   **today** the input path is the `pop` shell command over the USB CDC
@@ -109,8 +110,8 @@ present path is signed off — re-enable it for any future display bring-up.
 ## Known issues / next steps
 
 - **[HW]** Everything in the sign-off list above — first boot on the board.
-- **[audio]** HDMI-audio register-path feasibility check (bounded
-  investigation, expected negative → I2S).
+- **[audio]** RESOLVED — HDMI audio implemented via direct MAI + DMA
+  (`RUNTIME_REPORT_AUDIO.md`); hardware sign-off pending there.
 - **[input]** Build the HOGP keyboard module (shared with
   termdirect/tuidirect); verify 8BitDo Micro K-mode advertises as BLE HID
   before committing (fallback: Xbox Series controller).

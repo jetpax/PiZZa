@@ -60,7 +60,29 @@ choice SDLPOP_AUDIO_BACKEND
 config SDLPOP_AUDIO_NONE
 	bool "None -- SDL_OpenAudio fails, game disables audio"
 
+config SDLPOP_AUDIO_HDMI
+	bool "HDMI audio via VC4 MAI (48 kHz stereo IEC958, BCM2835 DMA)"
+	depends on DMA_BCM2835 && BCM2835_FB
+	help
+	  Real §5a backend (HDMI-audio work order): the game's 44.1 kHz
+	  callback mix is resampled to 48 kHz, packed into IEC958
+	  subframes and DMA-fed (DREQ-paced) into the VC4 MAI FIFO on
+	  the HDMI output the firmware already drives for video.
+	  Requires hdmi_drive=2 in config.txt and a display that
+	  accepts audio (a TV, not a DVI monitor).
+
 endchoice
+
+config SDLPOP_AUDIO_HDMI_TEST_TONE
+	bool "Boot into the M2 1 kHz test tone instead of game audio"
+	depends on SDLPOP_AUDIO_HDMI
+	default n
+	help
+	  Hardware sign-off diagnostic (work order M2): at boot the
+	  backend opens with a synthetic 1 kHz -12 dBFS source through
+	  the full resample/pack/DMA/MAI path and plays it forever.
+	  The game still runs, but its own SDL_OpenAudio fails while
+	  the tone owns the path. Check status with `pop audio`.
 
 module = SDLPOP
 module-str = sdlpop

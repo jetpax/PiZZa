@@ -30,18 +30,28 @@ os/sdlpop/
     ├── shim_timer.c        ticks/delay/perf on k_uptime/k_timer
     ├── shim_rw.c           SDL_RW* (mem-backed real; file via pack)
     ├── shim_image.c        IMG_Load_RW -> PIMG parse (no PNG decoder)
-    ├── shim_stub.c         audio (C) + pad/haptic (D) — deferred §5
+    ├── shim_stub.c         audio (C) delegation + pad/haptic (D) stubs
     ├── shim_posix.c        write/dir POSIX calls (read-only store)
     ├── pop_assets.c        embedded asset pack fd layer (§4)
     ├── pop_pack.S          .incbin of the generated pack
     ├── pop_present_display.c   HW: bcm2835_fb + HVS  (§ hardware)
     ├── pop_present_semihost.c  SIM: PPM frames via semihosting
     ├── pop_present_none.c      link/sim fallback
-    ├── shim_audio_none.c    §5a seam — real I2S backend drops in here
+    ├── shim_audio_none.c    §5a seam — default where HDMI audio absent
+    ├── shim_audio_hdmi.c    §5a REAL backend: HDMI audio via VC4 MAI
+    ├── audio/               freestanding core (host-tested) + MAI init
+    │   ├── iec958_pack.c    S16 -> IEC958 subframes (192-frame blocks)
+    │   ├── resample_48k.c   147:160 polyphase (44.1k -> 48k), Q15
+    │   ├── ring.c           cyclic DMA block-ring bookkeeping
+    │   ├── audio_pump.c     source -> resample -> pack, one block/call
+    │   └── hdmi_audio_init.c  MAI + audio infoframe + N/CTS (clean-room)
     ├── shim_scripted.c      §5b seam — synthetic input source
     ├── shim_selftest.c      color-bar video-path self-test
     └── shim_main.c          Zephyr entry -> SDL_main
 ```
+
+Host tests for the audio core: `tests/audio_host/` (`make run`);
+report: `RUNTIME_REPORT_AUDIO.md`.
 
 ## Build
 
@@ -68,7 +78,8 @@ west build -d build-sdlpop-qemu -t run     # writes sdlpop_frame_*.ppm
 
 ## Asset pipeline (§4 — preferred, executed)
 
-`tools/pack_assets.py` walks `data/` (music excluded — audio is deferred),
+`tools/pack_assets.py` walks `data/` (music/ excluded — this checkout
+ships no oggs there anyway; OPL3 music uses the packed MIDISND DATs),
 pre-converts every PNG to a raw **PIMG** blob (indexed pixels + RGBA
 palette, `tRNS` preserved), and packs the tree into `sdlpop_assets.bin`,
 linked into `.rodata` via `pop_pack.S`. `pop_assets.c` exposes it as a
@@ -77,13 +88,18 @@ tinystdio) and `SDL_RWFromFile` resolve with **no PNG decoder and no FS
 driver on the critical path** — deterministic boot. SD+FAT remains the
 documented fallback if asset iteration without reflashing is ever wanted.
 
-## Backend seams (deferred scope, §5)
+## Backend seams (§5)
 
-- **Audio (§5a):** `shim_stub.c` audio entry points delegate to a
-  `pop_audio_*` table; `shim_audio_none.c` fails `OpenAudio`, so SDLPoP
-  sets `digi_unavailable` and disables its whole audio path. A real
-  `shim_audio_i2s.c` (Kconfig-selected, no runtime vtable) drops in with
-  no game or shim change.
+- **Audio (§5a): implemented.** `shim_stub.c` audio entry points
+  delegate to the `pop_audio_*` table. On `rpi_zero_2w`,
+  `CONFIG_SDLPOP_AUDIO_HDMI` selects `shim_audio_hdmi.c`: the game's
+  44.1 kHz callback mix is resampled to 48 kHz, packed into IEC958
+  subframes and DMA-fed (DREQ 17) into the VC4 MAI FIFO on the same
+  HDMI cable as video — no VCHIQ, no game or shim change (the seam
+  worked as designed). `shim_audio_none.c` remains the default
+  elsewhere (qemu). Diagnostics: `pop audio`, `pop starve <n>`;
+  M2 tone image via `CONFIG_SDLPOP_AUDIO_HDMI_TEST_TONE`. See
+  `RUNTIME_REPORT_AUDIO.md`.
 - **Input (§5b):** `shim_event.c` accepts events from any producer.
   `shim_scripted.c` is the sim producer (synthetic timeline);
   `shim_shell.c` is the **hardware** producer — a `pop` shell command on
