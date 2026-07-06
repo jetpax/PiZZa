@@ -29,8 +29,21 @@ set(SDL2SHIM_CORE_SOURCES
 # Opt-in pieces the app appends as needed.
 set(SDL2SHIM_AUDIO_NONE ${SDL2SHIM_DIR}/src/audio_none.c)
 set(SDL2SHIM_SCRIPTED   ${SDL2SHIM_DIR}/src/shim_scripted.c)
+set(SDL2SHIM_USB        ${SDL2SHIM_DIR}/src/shim_usb.c)
+
+# HDMI-MAI audio backend: the freestanding IEC958/resample/ring/pump
+# core (host-tested) + MAI programming + the SDL-audio-callback glue.
+set(SDL2SHIM_AUDIO_HDMI_SOURCES
+  ${SDL2SHIM_DIR}/src/shim_audio_hdmi.c
+  ${SDL2SHIM_DIR}/src/audio/iec958_pack.c
+  ${SDL2SHIM_DIR}/src/audio/resample_48k.c
+  ${SDL2SHIM_DIR}/src/audio/ring.c
+  ${SDL2SHIM_DIR}/src/audio/audio_pump.c
+  ${SDL2SHIM_DIR}/src/audio/hdmi_audio_init.c
+)
 
 set(SDL2SHIM_INCLUDE_DIRS
   ${SDL2SHIM_DIR}/include
   ${SDL2SHIM_DIR}
+  ${SDL2SHIM_DIR}/src
 )

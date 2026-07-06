@@ -17,6 +17,12 @@ cmake_minimum_required(VERSION 3.20.0)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(pizza-doom C ASM)
 
+# sample_usbd helper for the USB CDC ACM shell (rpi_zero_2w), same as
+# PizzaShell / wipeout / SDLPoP.
+if(CONFIG_USB_DEVICE_STACK_NEXT)
+  include(${ZEPHYR_BASE}/samples/subsys/usb/common/common.cmake)
+endif()
+
 # ── Doom game tree (untouched) ──────────────────────────────────────
 if(NOT DEFINED DOOM_SRC_DIR)
   set(DOOM_SRC_DIR "$ENV{HOME}/github/sdl2-doom/src")
@@ -97,10 +103,21 @@ else()
   list(APPEND DOOM_SHIM_SRC src/doom_present_none.c)
 endif()
 
-# Audio backend. qemu uses "none" (Mix_OpenAudio fails, silent); the
-# HDMI/MAI backend is wired in at G4.
-if(CONFIG_DOOM_AUDIO_NONE)
+# Audio backend (lib-owned choice): qemu uses "none" (Mix_OpenAudio
+# fails, Doom silent); rpi_zero_2w uses the HDMI/MAI backend the mixer
+# feeds through s2s_audio_open.
+if(CONFIG_SDL2SHIM_AUDIO_HDMI)
+  list(APPEND DOOM_SHIM_SRC ${SDL2SHIM_AUDIO_HDMI_SOURCES})
+else()
   list(APPEND DOOM_SHIM_SRC ${SDL2SHIM_AUDIO_NONE})
+endif()
+
+# USB device bring-up + the `doom` shell = interactive input on hardware.
+if(CONFIG_USB_DEVICE_STACK_NEXT)
+  list(APPEND DOOM_SHIM_SRC ${SDL2SHIM_USB})
+endif()
+if(CONFIG_SHELL)
+  list(APPEND DOOM_SHIM_SRC src/doom_shell.c)
 endif()
 
 if(CONFIG_DOOM_SCRIPTED_INPUT)

@@ -3,6 +3,10 @@
 # PiZZa sdl2-doom port -- app options. Backend choices are the seams the
 # app's CMakeLists uses to pick the present/audio TU.
 
+# SAMPLE_USBD_* options for sample_usbd_init.c on boards with the USB
+# device stack (rpi_zero_2w).
+source "samples/subsys/usb/common/Kconfig.sample_usbd"
+
 rsource "../lib/sdl2shim/Kconfig"
 
 menu "PiZZa sdl2-doom port"
@@ -29,15 +33,6 @@ config DOOM_CAPTURE_EVERY
 	int "Capture every Nth presented frame (0 = first frame only)"
 	depends on DOOM_PRESENT_SEMIHOST
 	default 0
-
-choice DOOM_AUDIO_BACKEND
-	prompt "Audio backend"
-	default DOOM_AUDIO_NONE
-
-config DOOM_AUDIO_NONE
-	bool "None -- Mix_OpenAudio fails, Doom runs silent"
-
-endchoice
 
 config DOOM_SCRIPTED_INPUT
 	bool "Drive Doom from a scripted synthetic input source"

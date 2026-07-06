@@ -3,13 +3,41 @@
 # apps/lib/sdl2shim -- shared minimal SDL2 shim.
 #
 # The shim TUs register a log module against CONFIG_SDL2SHIM_LOG_LEVEL.
-# Present/audio/video backend selection is the consuming app's concern
-# (backends diverge by frame format and board), so the app's CMakeLists
-# picks the backend TU; this Kconfig only owns the log module.
+# The audio backend (none / HDMI-MAI) lives in the lib and is selected
+# here; the present + video backends diverge by frame format so those
+# stay the consuming app's concern (its CMakeLists picks the TU).
 #
 # Consuming apps pull this in with `rsource "../lib/sdl2shim/Kconfig"`.
 
 menu "sdl2shim (shared SDL2 shim)"
+
+choice SDL2SHIM_AUDIO_BACKEND
+	prompt "Audio backend"
+	default SDL2SHIM_AUDIO_NONE
+
+config SDL2SHIM_AUDIO_NONE
+	bool "None -- s2s_audio_open fails, the game runs silent"
+
+config SDL2SHIM_AUDIO_HDMI
+	bool "HDMI audio via VC4 MAI (48 kHz stereo IEC958, BCM2835 DMA)"
+	depends on DMA_BCM2835 && BCM2835_FB
+	help
+	  The game's 44.1 kHz callback mix is resampled to 48 kHz, packed
+	  into IEC958 subframes and DMA-fed (DREQ-paced) into the VC4 MAI
+	  FIFO on the firmware-established HDMI output. Requires hdmi_drive=2
+	  and a display that accepts HDMI audio (a TV, not a DVI monitor).
+
+endchoice
+
+config SDL2SHIM_AUDIO_HDMI_TEST_TONE
+	bool "Boot into a 1 kHz MAI test tone instead of game audio"
+	depends on SDL2SHIM_AUDIO_HDMI
+	default n
+	help
+	  Hardware sign-off diagnostic: at boot the backend opens with a
+	  synthetic 1 kHz source through the full resample/pack/DMA/MAI path.
+	  The game still runs but its Mix_OpenAudio fails while the tone owns
+	  the path. Check with the `doom audio` shell command.
 
 module = SDL2SHIM
 module-str = sdl2shim
