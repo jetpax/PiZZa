@@ -1,0 +1,7 @@
+# Keep the build context small and cache-stable.
+# The image needs only: Dockerfile, src/, integration/.
+build/
+sd-card/
+*.md
+flash-freepizza.sh
+.gitignore
