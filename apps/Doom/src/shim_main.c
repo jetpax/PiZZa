@@ -36,6 +36,11 @@ int main(void)
 	int argc = (int)(ARRAY_SIZE(argv) - 1);
 
 	printf("[doom] PiZZa sdl2-doom port, board %s\n", CONFIG_BOARD);
+
+	if (IS_ENABLED(CONFIG_DOOM_SCRIPTED_INPUT)) {
+		s2s_scripted_input_start();
+	}
+
 	printf("[doom] entering SDL_main (D_DoomMain)\n");
 
 	int rc = SDL_main(argc, argv);

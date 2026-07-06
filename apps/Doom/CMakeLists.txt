@@ -104,7 +104,8 @@ if(CONFIG_DOOM_AUDIO_NONE)
 endif()
 
 if(CONFIG_DOOM_SCRIPTED_INPUT)
-  list(APPEND DOOM_SHIM_SRC ${SDL2SHIM_SCRIPTED})
+  # Doom brings its own timeline; the lib's shim_scripted has SDLPoP's.
+  list(APPEND DOOM_SHIM_SRC src/doom_scripted.c)
 endif()
 
 # ── IWAD bake (§5): raw .incbin into rodata ─────────────────────────
