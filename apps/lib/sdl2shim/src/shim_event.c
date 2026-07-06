@@ -31,6 +31,41 @@ static struct k_spinlock q_lock;
 
 static Uint8 key_state[SDL_NUM_SCANCODES];
 
+/* SDL2 default scancode -> keycode: letters/digits and a few printable
+ * keys map to ASCII, everything else is scancode | SDLK_SCANCODE_MASK.
+ * Matches the SDLK_* values in SDL.h that the games compare against
+ * (Doom's i_input.c switches on event.key.keysym.sym).
+ */
+static SDL_Keycode keycode_from_scancode(SDL_Scancode sc)
+{
+	if (sc >= SDL_SCANCODE_A && sc <= SDL_SCANCODE_Z) {
+		return (SDL_Keycode)('a' + (sc - SDL_SCANCODE_A));
+	}
+	if (sc >= SDL_SCANCODE_1 && sc <= SDL_SCANCODE_9) {
+		return (SDL_Keycode)('1' + (sc - SDL_SCANCODE_1));
+	}
+	switch (sc) {
+	case SDL_SCANCODE_0:            return '0';
+	case SDL_SCANCODE_RETURN:       return '\r';
+	case SDL_SCANCODE_ESCAPE:       return '\x1b';
+	case SDL_SCANCODE_BACKSPACE:    return '\b';
+	case SDL_SCANCODE_TAB:          return '\t';
+	case SDL_SCANCODE_SPACE:        return ' ';
+	case SDL_SCANCODE_MINUS:        return '-';
+	case SDL_SCANCODE_EQUALS:       return '=';
+	case SDL_SCANCODE_LEFTBRACKET:  return '[';
+	case SDL_SCANCODE_RIGHTBRACKET: return ']';
+	case SDL_SCANCODE_BACKSLASH:    return '\\';
+	case SDL_SCANCODE_SEMICOLON:    return ';';
+	case SDL_SCANCODE_APOSTROPHE:   return '\'';
+	case SDL_SCANCODE_GRAVE:        return '`';
+	case SDL_SCANCODE_COMMA:        return ',';
+	case SDL_SCANCODE_PERIOD:       return '.';
+	case SDL_SCANCODE_SLASH:        return '/';
+	default:                        return (SDL_Keycode)(sc | SDLK_SCANCODE_MASK);
+	}
+}
+
 int s2s_event_submit(const SDL_Event *event)
 {
 	k_spinlock_key_t key = k_spin_lock(&q_lock);
@@ -57,6 +92,12 @@ int s2s_event_submit(const SDL_Event *event)
 		if (key_state[SDL_SCANCODE_LALT])   { mod |= KMOD_LALT; }
 		if (key_state[SDL_SCANCODE_RALT])   { mod |= KMOD_RALT; }
 		ev.key.keysym.mod = mod;
+
+		/* Producers set .scancode; derive .sym so Doom's i_input.c
+		 * (which switches on keysym.sym) works without each producer
+		 * having to know the keycode mapping.
+		 */
+		ev.key.keysym.sym = keycode_from_scancode(sc);
 	}
 
 	if (q_count == S2S_EVENT_QUEUE_LEN) {
