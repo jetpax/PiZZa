@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# apps/lib/sdl2shim -- shared minimal SDL2 shim.
+#
+# The shim TUs register a log module against CONFIG_SDL2SHIM_LOG_LEVEL.
+# Present/audio/video backend selection is the consuming app's concern
+# (backends diverge by frame format and board), so the app's CMakeLists
+# picks the backend TU; this Kconfig only owns the log module.
+#
+# Consuming apps pull this in with `rsource "../lib/sdl2shim/Kconfig"`.
+
+menu "sdl2shim (shared SDL2 shim)"
+
+module = SDL2SHIM
+module-str = sdl2shim
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu
