@@ -171,8 +171,15 @@ target_include_directories(app PRIVATE
 # Game TUs assume glibc (strcasecmp/alloca via string.h/stdlib.h);
 # picolibc keeps them in <strings.h>/<alloca.h>. Silence the pedantic
 # warnings the upstream build silences too.
+#
+# FEATURE_SOUND: sdl2-doom gates its SFX module table (i_sound.c
+# sound_modules[]) behind this, and defines it from the makefile
+# (CFLAGS+=-DFEATURE_SOUND), NOT config.h. Without it InitSfxModule finds
+# no module -> sound_module stays NULL -> I_StartSound never dispatches ->
+# silent SFX (music still plays: InitMusicModule hardcodes its module past
+# the ifdef, which is what masked this as "mixer open, 0 mix calls").
 set_source_files_properties(${DOOM_GAME_SRC} PROPERTIES COMPILE_OPTIONS
-  "-Wno-unused-variable;-Wno-unused-but-set-variable;-Wno-missing-braces;-Wno-unused-function;-Wno-maybe-uninitialized;-Wno-implicit-fallthrough;-Wno-format;-Wno-int-conversion;-include;strings.h;-include;alloca.h;-D_DEFAULT_SOURCE"
+  "-Wno-unused-variable;-Wno-unused-but-set-variable;-Wno-missing-braces;-Wno-unused-function;-Wno-maybe-uninitialized;-Wno-implicit-fallthrough;-Wno-format;-Wno-int-conversion;-include;strings.h;-include;alloca.h;-D_DEFAULT_SOURCE;-DFEATURE_SOUND"
 )
 
 # i_main.c defines main(argc,argv) but does not include <SDL2/SDL.h>, so

@@ -169,8 +169,6 @@ static int cmd_keys(const struct shell *sh, size_t argc, char **argv)
 #ifdef CONFIG_SDL2SHIM_AUDIO_HDMI
 
 #include <zephyr/drivers/dma/dma_bcm2835.h>
-#include <math.h>
-#include <SDL2/SDL_mixer.h>
 #include "audio/hdmi_audio.h"
 
 /* HDMI-audio bring-up diagnostics (work order M2): pump/ring
@@ -237,111 +235,6 @@ static int cmd_audio_starve(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
-/* Mixer state: is it open, at what rate, and are Doom's sounds actually
- * reaching it (channels playing > 0 during gameplay)?
- */
-extern uint32_t mixer_play_calls;
-extern uint32_t mixer_last_alen;
-extern int mixer_last_chan;
-extern uint32_t mixer_finishes;
-
-/* Doom WAD accessors, declared here to probe a sound lump the way
- * CacheSFX does without pulling in Doom's headers (which clash).
- */
-extern int W_CheckNumForName(char *name);
-extern int W_LumpLength(unsigned int lump);
-extern void *W_CacheLumpNum(int lump, int tag);
-
-static int cmd_mix(const struct shell *sh, size_t argc, char **argv)
-{
-	int freq = 0, chans = 0;
-	Uint16 fmt = 0;
-	int is_open;
-
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	is_open = Mix_QuerySpec(&freq, &fmt, &chans);
-	shell_print(sh, "mixer: %s, %d Hz, fmt 0x%04x, %d ch",
-		    is_open ? "open" : "closed", freq, fmt, chans);
-	shell_print(sh, "channels currently playing: %d", Mix_Playing(-1));
-	shell_print(sh, "Mix_PlayChannelTimed: %u calls (incl. mixtest), last chan %d, "
-		    "last alen %u B = %u frames; instant-finishes %u",
-		    mixer_play_calls, mixer_last_chan, mixer_last_alen,
-		    mixer_last_alen / 4, mixer_finishes);
-	return 0;
-}
-
-/* Loop a known 1 kHz sine THROUGH the mixer (Mix_PlayChannelTimed ->
- * mixer_callback -> pump -> MAI). Clean tone => the mixer path is good
- * and the game noise is in Doom's chunk data; noise here => the mixer
- * core itself is wrong on target. Best run at the title/menu (quiet).
- */
-static int16_t mixtest_sine[441 * 2];
-static Mix_Chunk mixtest_chunk;
-
-static int cmd_mixtest(const struct shell *sh, size_t argc, char **argv)
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	for (int i = 0; i < 441; i++) {
-		int16_t s = (int16_t)(8192.0f * sinf(2.0f * 3.14159265f *
-					1000.0f * (float)i / 44100.0f));
-
-		mixtest_sine[2 * i] = s;
-		mixtest_sine[2 * i + 1] = s;
-	}
-	mixtest_chunk.allocated = 0;
-	mixtest_chunk.abuf = (Uint8 *)mixtest_sine;
-	mixtest_chunk.alen = sizeof(mixtest_sine);
-	mixtest_chunk.volume = 128;
-
-	int ch = Mix_PlayChannelTimed(0, &mixtest_chunk, -1, -1);
-
-	Mix_SetPanning(0, 255, 255);
-	shell_print(sh, "mixtest: 1 kHz sine looping on channel %d via the mixer", ch);
-	shell_print(sh, "  clean tone => mixer path OK (fault is Doom's data)");
-	shell_print(sh, "  noise      => mixer core wrong on target; `doom halt` to stop");
-	return 0;
-}
-
-static int cmd_halt(const struct shell *sh, size_t argc, char **argv)
-{
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-	Mix_HaltChannel(-1);
-	shell_print(sh, "halted all mixer channels");
-	return 0;
-}
-
-/* Probe a DMX sound lump exactly as CacheSFX does: resolve dsNAME, read
- * its length and the 8-byte header. Valid DMX = hdr "03 00"; anything
- * else (or a NOT-FOUND / bad length) is why CacheSFX rejects the sound.
- */
-static int cmd_sfxprobe(const struct shell *sh, size_t argc, char **argv)
-{
-	char lump[16] = "ds";
-	const uint8_t *d;
-	int n, len;
-
-	strncat(lump, (argc >= 2) ? argv[1] : "pistol", sizeof(lump) - 3);
-
-	n = W_CheckNumForName(lump);
-	if (n < 0) {
-		shell_print(sh, "%s: lump NOT FOUND", lump);
-		return 0;
-	}
-	len = W_LumpLength((unsigned int)n);
-	d = W_CacheLumpNum(n, 1 /* PU_STATIC */);
-	shell_print(sh, "%s: lump %d, len %d", lump, n, len);
-	shell_print(sh, "  hdr %02x %02x  rate %u  len32 %u  (valid DMX = 03 00)",
-		    d[0], d[1], (unsigned int)(d[2] | (d[3] << 8)),
-		    (unsigned int)(d[4] | (d[5] << 8) | (d[6] << 16) |
-				   ((unsigned int)d[7] << 24)));
-	return 0;
-}
-
 #endif /* CONFIG_SDL2SHIM_AUDIO_HDMI */
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_doom,
@@ -354,10 +247,6 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_doom,
 	SHELL_CMD(audio,    NULL, "HDMI audio path diagnostics", cmd_audio),
 	SHELL_CMD_ARG(starve, NULL, "<blocks>  -- starve the audio ring (underrun demo)",
 		      cmd_audio_starve, 2, 0),
-	SHELL_CMD(mix,      NULL, "mixer state (freq, channels playing)", cmd_mix),
-	SHELL_CMD(mixtest,  NULL, "loop a 1 kHz sine through the mixer (isolate mixer vs data)", cmd_mixtest),
-	SHELL_CMD(halt,     NULL, "halt all mixer channels", cmd_halt),
-	SHELL_CMD_ARG(sfxprobe, NULL, "[name]  -- read a DMX sound lump (default pistol)", cmd_sfxprobe, 1, 1),
 #endif
 	SHELL_SUBCMD_SET_END
 );

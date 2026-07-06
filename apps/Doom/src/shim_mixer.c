@@ -66,15 +66,6 @@ static int mix_chans;
  */
 static int16_t scratch[MIX_BLOCK_MAX * 2];
 
-/* Diagnostics for `doom mix`: is Doom actually feeding the mixer, with
- * valid chunks, and do sounds finish instantly? Globals so the shell can
- * read them; the whole SFX path first executes on hardware.
- */
-uint32_t mixer_play_calls;
-uint32_t mixer_last_alen;
-int mixer_last_chan = -1;
-uint32_t mixer_finishes;
-
 /* ── the audio callback (mixer core) ─────────────────────────────── */
 
 static void run_effects(struct effect *fx, int chan, int16_t *buf, int len_bytes)
@@ -124,7 +115,6 @@ static void mixer_callback(void *userdata, Uint8 *stream, int len)
 			if (ch->pos >= ch->chunk->alen) {
 				if (ch->loops == 0) {
 					ch->playing = false;
-					mixer_finishes++;
 				} else {
 					if (ch->loops > 0) {
 						ch->loops--;
@@ -289,9 +279,6 @@ int Mix_PlayChannelTimed(int channel, Mix_Chunk *chunk, int loops, int ticks)
 	ch->loops = loops;
 	ch->playing = true;
 
-	mixer_play_calls++;
-	mixer_last_alen = chunk->alen;
-	mixer_last_chan = channel;
 	s2s_audio_unlock();
 
 	return channel;
