@@ -1,0 +1,66 @@
+diff --git a/firmware/romstage.c b/firmware/romstage.c
+index 5827be4..a7286e3 100644
+--- a/firmware/romstage.c
++++ b/firmware/romstage.c
+@@ -32,6 +32,7 @@ VideoCoreIV first stage bootloader.
+ #include "interrupt.h"
+ #include "traps.h"
+ #include "otp.h"
++#include "../../src/boot_suspend_hook.h"
+ 
+ uint32_t g_CPUID;
+ 
+@@ -92,13 +93,42 @@ static void switch_vpu_to_pllc() {
+ 
+ void test(int);
+ 
++static inline void _fp_diag_str(const char *s) {
++  for (; *s; ++s) {
++    volatile int _tmo = 100000;
++    while ((*(volatile uint32_t*)0x7e201018 & 0x20) && (--_tmo > 0));
++    *(volatile uint32_t*)0x7e201000 = (uint32_t)(unsigned char)*s;
++  }
++}
++
+ int _main(unsigned int cpuid, uint32_t load_address, vc4_saved_state_t* pcb) {
++  {
++    uint32_t fsel1 = *(volatile uint32_t*)0x7e200004;
++    fsel1 = (fsel1 & ~0x3f000u) | (4u << 12) | (4u << 15);
++    *(volatile uint32_t*)0x7e200004 = fsel1;
++    *(volatile uint32_t*)0x7e201030 = 0;
++    *(volatile uint32_t*)0x7e1010f4 = 0x5a003900u;
++    *(volatile uint32_t*)0x7e1010f0 = 0x5a000211u;
++    *(volatile uint32_t*)0x7e201044 = 0x7ffu;
++    *(volatile uint32_t*)0x7e20102c = 0x70u;
++    *(volatile uint32_t*)0x7e201024 = 2u;
++    *(volatile uint32_t*)0x7e201028 = 59u;
++    *(volatile uint32_t*)0x7e201030 = 0x301u;
++  }
++  _fp_diag_str("MAIN\r\n");
++
++  _fp_diag_str("D1\r\n");
+   xtal_freq = 19200000;
++  _fp_diag_str("D2\r\n");
+   parse_otp_into(&otpInfo);
++  _fp_diag_str("D3\r\n");
+ 
+   set_pl011_funcs();
++  _fp_diag_str("D4\r\n");
+   pl011_uart_init(115200);
++  _fp_diag_str("D5\r\n");
+   puts("pre-pll hello\n");
++  _fp_diag_str("D6\r\n");
+   pretty_print_otp();
+ 
+   switch_vpu_to_pllc();
+@@ -136,8 +166,8 @@ int _main(unsigned int cpuid, uint32_t load_address, vc4_saved_state_t* pcb) {
+   PEStartPlatform(&otpInfo);
+   __asm__ volatile("ei");
+ 
+-	/* start vpu monitor */
+-	monitor_start();
++	/* Free PiZZa: trigger suspend-to-RAM instead of the VPU monitor. */
++	enter_suspend_mode();
+ 
+ 	panic("main exiting!");
+ }

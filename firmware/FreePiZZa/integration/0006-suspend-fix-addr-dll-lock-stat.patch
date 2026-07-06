@@ -1,0 +1,56 @@
+Fix wrong APHY register addresses in suspend.c
+
+The vc4-suspend register map has two addresses swapped relative to
+upstream librerpi/common/broadcom/bcm2708_chip/sdc_addr_front.h:
+
+    Symbol                              suspend.c   upstream
+    APHY_CSR_PHY_BIST_CNTRL_SPR         0x7EE06020  0x7ee06080
+    APHY_CSR_GLBL_ADDR_DLL_LOCK_STAT    0x7EE06010  0x7ee06020
+
+The real 0x7EE06010 is APHY_CSR_GLBL_ADDR_DLL_PH_LD_VAL (phase load
+value); the real 0x7EE06020 is the address DLL lock status register.
+Author appears to have confused the two.
+
+Effect on suspend/resume:
+ - Writing 0x30 to what suspend.c calls PHY_BIST_CNTRL_SPR wrote to
+   the DLL lock stat register instead. SDC never told "I'm about to
+   change address lines".
+ - Reading the "lock stat" as == 3 polled the PH_LD_VAL register.
+   Real DLL lock never observed -> 200000-tick timeout every time ->
+   "Address DLL lock timeout" -> SDRAM controller restart fails ->
+   "FATAL: SDRAM controller failed to come up!" -> watchdog reset.
+
+Symptoms on first-light: after wake IRQ handled, the resume path in
+sdram_exit_selfrefresh() gets through DDR PLL re-lock and DPHY DLL
+lock, but times out waiting for address DLL lock, then fails to
+restart the SDRAM controller, then the watchdog resets the board.
+
+Fix: update both addresses to match upstream. No other code changes
+needed; the fix is purely in the address constants.
+
+Apply against pristine vc4-suspend src/ (with `git apply
+--ignore-whitespace` if line endings differ).
+
+diff --git a/src/suspend.c b/src/suspend.c
+index 1d95642..7c17bf5 100644
+--- a/src/suspend.c
++++ b/src/suspend.c
+@@ -232,10 +232,14 @@
+ #define APHY_CSR_DDR_PLL_MDIV_VALUE      REG32(0x7EE06034)
+ #define APHY_CSR_DDR_PLL_LOCK_STATUS     REG32(0x7EE06048)
+ #define APHY_CSR_DDR_PLL_PWRDWN          REG32(0x7EE06058)
+-/* PHY BIST control -- upstream reset_phy_dll() uses this to signal SDC */
+-#define APHY_CSR_PHY_BIST_CNTRL_SPR      REG32(0x7EE06020)
+-/* Address DLL lock status -- upstream waits for == 3 */
+-#define APHY_CSR_GLBL_ADDR_DLL_LOCK_STAT REG32(0x7EE06010)
++/* PHY BIST control -- upstream reset_phy_dll() uses this to signal SDC.
++ * Per upstream sdc_addr_front.h @ 0x7ee06080; prior value 0x7EE06020 was
++ * actually the address DLL lock status register (see below). */
++#define APHY_CSR_PHY_BIST_CNTRL_SPR      REG32(0x7EE06080)
++/* Address DLL lock status -- upstream waits for == 3.
++ * Per upstream sdc_addr_front.h @ 0x7ee06020; prior value 0x7EE06010 was
++ * actually APHY_CSR_GLBL_ADDR_DLL_PH_LD_VAL (phase load value). */
++#define APHY_CSR_GLBL_ADDR_DLL_LOCK_STAT REG32(0x7EE06020)
+ /* Address pad drive/slew -- upstream sdc_addr_front.h: 0x7ee06068 */
+ #define APHY_CSR_ADDR_PAD_DRV_SLEW_CTRL  REG32(0x7EE06068)
+ /* PVT compensation (process/voltage/temperature recalibration) */

@@ -1,0 +1,61 @@
+Don't watchdog-reset on SDUP timeout after resume RESTRT
+
+Upstream sdram.c reset_with_timing() writes SD_CS = ...|RESTRT_SET at
+the end and returns without waiting for SDUP; init_late/selftest is
+the real "SDRAM up?" check.
+
+vc4-suspend's sdram_exit_selfrefresh() adds a 200000-iter SDUP wait
+after RESTRT, and on Free PiZZa's first HW test that timeout fires
+and triggers a watchdog reset -- even though the resume path had
+cleanly made it through DDR PLL re-lock, SDRAM clock un-gate, and
+DPHY/APHY DLL locks. Empirical result: with this patch, after RESTRT
+SD_CS reads 0x00214E43 (SDUP bit 15 remains clear) but sdram_mem_test
+passes and ZQ calibration completes -- SDRAM is functional even
+though the SDUP bit isn't asserting.
+
+Fix by matching upstream's model: after RESTRT, udelay(2000), poll
+SDUP with a very generous 2000000-iter timeout, but on timeout just
+warn and continue. sdram_mem_test is the real functional gate.
+
+Also lift the uart_print_hex extern declaration up to the top DBG
+block so the resume warning can print SD_CS as diagnostic info
+without tripping -Wimplicit-function-declaration.
+
+Apply on top of pristine vc4-suspend src/ with
+`git apply --ignore-whitespace` (works standalone or on 0006).
+
+diff --git a/src/suspend.c b/src/suspend.c
+--- a/src/suspend.c
++++ b/src/suspend.c
+@@ -264,6 +264,7 @@
+  * ========================================================================== */
+ #ifndef NDEBUG
+ extern int printf(const char *fmt, ...);
++extern void uart_print_hex(uint32_t val);
+ #define DBG(msg) printf(msg)
+ #else
+ #define DBG(msg) ((void)0)
+@@ -883,15 +884,17 @@ void sdram_exit_selfrefresh(const sdram_config_t *cfg) {
+              & ~(SD_CS_STOP_SET | SD_CS_STBY_SET))
+             | SD_CS_RESTRT_SET;
+ 
+-    /* Wait for SDRAM UP */
+-    for (timeout = 200000; timeout > 0; --timeout) {
++    /* Upstream reset_with_timing does RESTRT and returns without waiting for
++     * SDUP; init_late/selftest is the real functional check. Give the
++     * controller settling time, log status, let sdram_mem_test be the gate. */
++    udelay(2000);
++    for (timeout = 2000000; timeout > 0; --timeout) {
+         if (SD_CS & SD_CS_SDUP_SET) break;
+     }
+     if (timeout == 0) {
+-        DBG("[suspend] FATAL: SDRAM controller failed to come up!\n");
+-        PM_WDOG = PM_PASSWORD | 10;
+-        PM_RSTC = PM_PASSWORD | PM_RSTC_WRCFG_FULL_RESET;
+-        for (;;) { /* wait for watchdog */ }
++        DBG("[suspend] WARNING: SDUP still clear after RESTRT (SD_CS=");
++        uart_print_hex(SD_CS);
++        DBG("); continuing to mem test\n");
+     }
+ 
+     /* JEDEC-required: MR restore + ZQ recalibration after self-refresh exit.
