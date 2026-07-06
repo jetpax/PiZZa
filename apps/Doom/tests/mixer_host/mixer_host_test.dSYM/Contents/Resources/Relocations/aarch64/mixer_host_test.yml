@@ -1,5 +1,0 @@
----
-triple:          'arm64-apple-darwin'
-binary-path:     mixer_host_test
-relocations:     []
-...
