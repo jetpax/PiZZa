@@ -84,6 +84,26 @@ add_custom_command(
 )
 list(APPEND DOOM_GAME_SRC ${DOOM_IVIDEO_GEN})
 
+# OPL music: the fork's InitMusicModule hardcodes music_sdl_module. Swap it
+# to music_opl_module (from the ported i_oplmusic.c) via a build-dir gen
+# copy -- pristine checkout, same as the i_video rewrite.
+if(CONFIG_DOOM_MUSIC_OPL)
+  list(REMOVE_ITEM DOOM_GAME_SRC ${DOOM_SRC_DIR}/i_sound.c)
+  set(DOOM_ISOUND_GEN ${CMAKE_BINARY_DIR}/gen/i_sound_opl.c)
+  add_custom_command(
+    OUTPUT ${DOOM_ISOUND_GEN}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/gen
+    COMMAND ${CMAKE_COMMAND} -E copy ${DOOM_SRC_DIR}/i_sound.c ${DOOM_ISOUND_GEN}
+    COMMAND sed -i.bak
+            -e "s|music_module = &music_sdl_module|music_module = \\&music_opl_module|"
+            ${DOOM_ISOUND_GEN}
+    DEPENDS ${DOOM_SRC_DIR}/i_sound.c
+    COMMENT "Selecting OPL music module (music_sdl -> music_opl)"
+    VERBATIM
+  )
+  list(APPEND DOOM_GAME_SRC ${DOOM_ISOUND_GEN})
+endif()
+
 # ── shim ────────────────────────────────────────────────────────────
 include(${CMAKE_CURRENT_SOURCE_DIR}/../lib/sdl2shim/sdl2shim.cmake)
 
@@ -110,6 +130,35 @@ if(CONFIG_SDL2SHIM_AUDIO_HDMI)
   list(APPEND DOOM_SHIM_SRC ${SDL2SHIM_AUDIO_HDMI_SOURCES})
 else()
   list(APPEND DOOM_SHIM_SRC ${SDL2SHIM_AUDIO_NONE})
+endif()
+
+# OPL music (CONFIG_DOOM_MUSIC_OPL): Chocolate Doom's OPL synth, referenced
+# from the Chocolate checkout (like the game tree is from sdl2-doom). Nuked
+# OPL3 emulator + i_oplmusic sequencer + opl_sdl driver (folds into the
+# mixer as a MIX_CHANNEL_POST effect); opl_glue.c supplies the SDL
+# mutex/cond + SDL_MixAudioFormat the OPL code expects. Flags + includes are
+# applied below alongside the game TUs.
+if(CONFIG_DOOM_MUSIC_OPL)
+  if(NOT DEFINED CHOCOLATE_SRC_DIR)
+    set(CHOCOLATE_SRC_DIR "$ENV{HOME}/github/chocolate-doom")
+  endif()
+  if(NOT EXISTS "${CHOCOLATE_SRC_DIR}/opl/opl3.c")
+    message(FATAL_ERROR
+      "OPL music needs chocolate-doom at ${CHOCOLATE_SRC_DIR} "
+      "(opl/ + src/i_oplmusic.c). Pass -DCHOCOLATE_SRC_DIR=<path>.")
+  endif()
+  # i_oplmusic.c is referenced pristine: it sits next to Chocolate's own
+  # headers, so its ""-includes resolve to Chocolate's (self-consistent),
+  # and its music_module_t is layout-compatible with the fork's.
+  set(DOOM_OPL_SRC
+    ${CHOCOLATE_SRC_DIR}/opl/opl.c
+    ${CHOCOLATE_SRC_DIR}/opl/opl3.c
+    ${CHOCOLATE_SRC_DIR}/opl/opl_queue.c
+    ${CHOCOLATE_SRC_DIR}/opl/opl_sdl.c
+    ${CHOCOLATE_SRC_DIR}/src/midifile.c
+    ${CHOCOLATE_SRC_DIR}/src/i_oplmusic.c
+  )
+  list(APPEND DOOM_SHIM_SRC ${DOOM_OPL_SRC} src/opl_glue.c)
 endif()
 
 # USB device bring-up + the `doom` shell = interactive input on hardware.
@@ -187,3 +236,19 @@ set_source_files_properties(${DOOM_GAME_SRC} PROPERTIES COMPILE_OPTIONS
 # shim_main.c's main(void) is the Zephyr entry.
 set_source_files_properties(${DOOM_SRC_DIR}/i_main.c PROPERTIES
   COMPILE_DEFINITIONS "main=SDL_main")
+
+# OPL TUs (from the Chocolate checkout). i_oplmusic.c + midifile.c sit next
+# to Chocolate's own headers, so their ""-includes (i_sound.h etc.) resolve
+# to Chocolate's -- self-consistent, and its music_module_t is layout-
+# compatible with the fork's (only a const qualifier differs), so
+# music_opl_module links against the fork's InitMusicModule. Add opl/ + src/
+# for the OPL-only headers, and the shim's SDL2/ dir for the bare "SDL.h".
+if(CONFIG_DOOM_MUSIC_OPL)
+  target_include_directories(app PRIVATE
+    ${CHOCOLATE_SRC_DIR}/opl
+    ${CHOCOLATE_SRC_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../lib/sdl2shim/include/SDL2
+  )
+  set(OPL_FLAGS "-Wno-unused-variable;-Wno-unused-but-set-variable;-Wno-unused-function;-Wno-missing-braces;-Wno-implicit-fallthrough;-Wno-format;-Wno-maybe-uninitialized;-Wno-int-conversion;-include;strings.h;-D_DEFAULT_SOURCE")
+  set_source_files_properties(${DOOM_OPL_SRC} PROPERTIES COMPILE_OPTIONS "${OPL_FLAGS}")
+endif()

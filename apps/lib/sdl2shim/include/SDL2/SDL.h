@@ -581,6 +581,7 @@ typedef Uint16 SDL_AudioFormat;
 #define AUDIO_U8     0x0008
 #define AUDIO_S16LSB 0x8010
 #define AUDIO_S16SYS AUDIO_S16LSB
+#define SDL_AUDIO_ALLOW_FREQUENCY_CHANGE 0x00000001
 
 typedef struct SDL_AudioSpec {
 	int freq;
@@ -623,6 +624,28 @@ int SDL_BuildAudioCVT(SDL_AudioCVT *cvt,
 		      SDL_AudioFormat src_format, Uint8 src_channels, int src_rate,
 		      SDL_AudioFormat dst_format, Uint8 dst_channels, int dst_rate);
 int SDL_ConvertAudio(SDL_AudioCVT *cvt);
+
+/* Saturating mix of src into dst (Chocolate's OPL FillBuffer uses this to
+ * fold the synth output into the post-mix block). volume is 0..128.
+ */
+#define SDL_MIX_MAXVOLUME 128
+void SDL_MixAudioFormat(Uint8 *dst, const Uint8 *src, SDL_AudioFormat format,
+			Uint32 len, int volume);
+
+/* ── threads: mutex + condvar (OPL driver + opl.c OPL_Delay) ──── */
+
+typedef struct SDL_mutex SDL_mutex;
+typedef struct SDL_cond SDL_cond;
+
+SDL_mutex *SDL_CreateMutex(void);
+void SDL_DestroyMutex(SDL_mutex *mutex);
+int SDL_LockMutex(SDL_mutex *mutex);
+int SDL_UnlockMutex(SDL_mutex *mutex);
+
+SDL_cond *SDL_CreateCond(void);
+void SDL_DestroyCond(SDL_cond *cond);
+int SDL_CondSignal(SDL_cond *cond);
+int SDL_CondWait(SDL_cond *cond, SDL_mutex *mutex);
 
 /* ── RWops ───────────────────────────────────────────────────── */
 

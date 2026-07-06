@@ -47,6 +47,16 @@ config DOOM_SIM_TUNING
 	  sim gates can capture gameplay. Requires an IWAD that contains
 	  E1M1 (the shareware doom1.wad; the miniwad does not).
 
+config DOOM_MUSIC_OPL
+	bool "OPL2/OPL3 FM music (Chocolate Doom synth via GENMIDI)"
+	default n
+	help
+	  Real Doom music: compiles Chocolate Doom's OPL subsystem (Nuked
+	  OPL3 emulator + i_oplmusic sequencer, referenced from
+	  CHOCOLATE_SRC_DIR) and folds the synth into the mixer via a
+	  MIX_CHANNEL_POST effect. Instruments come from the WAD's GENMIDI
+	  lump -- no external data. Replaces the silent music stubs.
+
 endmenu
 
 source "Kconfig.zephyr"

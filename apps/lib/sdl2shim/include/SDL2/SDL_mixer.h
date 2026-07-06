@@ -75,6 +75,15 @@ int Mix_SetPanning(int channel, Uint8 left, Uint8 right);
 int Mix_RegisterEffect(int chan, Mix_EffectFunc_t f, Mix_EffectDone_t d, void *arg);
 int Mix_UnregisterAllEffects(int channel);
 
+/* OPL music (Chocolate opl_sdl.c) touches these. Mix is already open (SFX
+ * owns it), so Mix_OpenAudioDevice's branch is never taken at runtime and
+ * Mix_HookMusic is only used in the OPL shutdown path -- both are stubs.
+ */
+int Mix_OpenAudioDevice(int frequency, Uint16 format, int channels,
+			int chunksize, const char *device, int allowed_changes);
+typedef void (*Mix_MusicHook)(void *udata, Uint8 *stream, int len);
+void Mix_HookMusic(Mix_MusicHook mix_func, void *arg);
+
 /* ── music subset -- stubbed (shim_mixer.c) ──────────────────────── */
 
 Mix_Music *Mix_LoadMUS(const char *file);
