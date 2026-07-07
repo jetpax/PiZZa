@@ -48,7 +48,10 @@ struct s2s_surface {
  */
 int s2s_event_submit(const SDL_Event *event);
 
-/* Scripted synthetic input source (CONFIG_SDL2SHIM_SCRIPTED_INPUT). */
+/* Scripted synthetic input source. Each consuming app supplies its own
+ * game-specific timeline (Doom's doom_scripted.c, SDLPoP's shim_scripted.c)
+ * behind this seam; the lib declares it but does not implement it.
+ */
 void s2s_scripted_input_start(void);
 
 /* ── present seam (s2s_present_*.c, Kconfig-selected) ────────── */

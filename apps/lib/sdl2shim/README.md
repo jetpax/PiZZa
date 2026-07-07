@@ -45,10 +45,12 @@ Game-agnostic translation units, grouped as the consuming CMake pulls them:
     a 1 kHz tone for hardware sign-off.
 
 - **Opt-in helpers**
-  - `SDL2SHIM_SCRIPTED` (`shim_scripted.c`) — a synthetic input timeline
-    (SDLPoP's; Doom brings its own app-local one).
   - `SDL2SHIM_USB` (`shim_usb.c`) — USB CDC-ACM shell bring-up for a device
     console on the rpi_zero_2w.
+
+  Scripted synthetic input is *not* a lib piece: the `s2s_scripted_input_start`
+  seam is declared here, but each game supplies its own timeline app-local
+  (Doom's `doom_scripted.c`, SDLPoP's `shim_scripted.c`).
 
 - **Headers** (`include/`)
   - `SDL2/SDL.h` — the SDL2 API subset: init/error, the single window +
@@ -106,7 +108,6 @@ target_include_directories(app PRIVATE ${SDL2SHIM_INCLUDE_DIRS})
 
 # pick an audio backend + any opt-in pieces:
 #   ${SDL2SHIM_AUDIO_NONE}   or  ${SDL2SHIM_AUDIO_HDMI_SOURCES}
-#   ${SDL2SHIM_SCRIPTED}         # synthetic input
 #   ${SDL2SHIM_USB}              # CDC-ACM shell
 ```
 
@@ -129,7 +130,7 @@ sdl2shim/
 │   └── dirent.h
 └── src/
     ├── shim_core.c  shim_event.c  shim_timer.c  shim_stub.c  shim_posix.c
-    ├── shim_scripted.c   shim_usb.c
+    ├── shim_usb.c
     ├── audio_none.c      shim_audio_hdmi.c
     └── audio/            # freestanding HDMI-MAI core (host-tested):
         ├── resample_48k.*  iec958_pack.*  ring.*  audio_pump.*

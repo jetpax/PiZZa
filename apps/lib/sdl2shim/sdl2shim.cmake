@@ -13,8 +13,6 @@
 #   include(${CMAKE_CURRENT_SOURCE_DIR}/../lib/sdl2shim/sdl2shim.cmake)
 #   target_sources(app PRIVATE ${SDL2SHIM_CORE_SOURCES} ${SDL2SHIM_AUDIO_NONE})
 #   target_include_directories(app PRIVATE ${SDL2SHIM_INCLUDE_DIRS})
-# and, when the app enables scripted input:
-#   target_sources(app PRIVATE ${SDL2SHIM_SCRIPTED})
 
 set(SDL2SHIM_DIR ${CMAKE_CURRENT_LIST_DIR})
 
@@ -28,7 +26,6 @@ set(SDL2SHIM_CORE_SOURCES
 
 # Opt-in pieces the app appends as needed.
 set(SDL2SHIM_AUDIO_NONE ${SDL2SHIM_DIR}/src/audio_none.c)
-set(SDL2SHIM_SCRIPTED   ${SDL2SHIM_DIR}/src/shim_scripted.c)
 set(SDL2SHIM_USB        ${SDL2SHIM_DIR}/src/shim_usb.c)
 
 # HDMI-MAI audio backend: the freestanding IEC958/resample/ring/pump
