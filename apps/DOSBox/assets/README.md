@@ -14,11 +14,19 @@ Supply your own DOS DOOM binary and the shareware IWAD. `DOOM.EXE` (the
 registered v1.9 build) has DOS/4GW bound in, so no separate extender is
 needed. `doom1.wad` is the freely redistributable shareware IWAD.
 
+`DEFAULT.CFG` preselects Sound Blaster SFX + SB FM (OPL) music at the
+standard A220/I7/D1 so vanilla DOOM makes sound without running SETUP;
+`SETUP.EXE` is included for interactive reconfiguration.
+
 ```sh
+printf 'snd_channels 3\r\nsnd_musicdevice 3\r\nsnd_sfxdevice 3\r\nsnd_sbport 544\r\nsnd_sbirq 7\r\nsnd_sbdma 1\r\nsnd_mport 816\r\n' > default.cfg
 dd if=/dev/zero of=doom.img bs=1024 count=6552
 mformat -i doom.img -h 16 -s 63 -t 13 ::
 mcopy -i doom.img /path/to/DOOM.EXE  ::DOOM.EXE
 mcopy -i doom.img /path/to/doom1.wad ::DOOM1.WAD
+mcopy -i doom.img /path/to/SETUP.EXE ::SETUP.EXE
+mcopy -i doom.img default.cfg ::DEFAULT.CFG
+rm default.cfg
 ```
 
 ## floppy.img -- the storage smoke-test image

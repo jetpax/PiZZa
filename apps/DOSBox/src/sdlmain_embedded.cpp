@@ -595,6 +595,17 @@ int main(void)
 			ds->HandleInputline("memsizekb=0");
 			ds->HandleInputline("memsize=16");
 		}
+
+		/* the shim's HDMI-MAI audio backend is fixed at 44100/S16/2ch
+		 * (it resamples to 48 kHz IEC958 itself); dosbox defaults to
+		 * 48000, which the backend would reject.
+		 */
+		Section *mx = control->GetSection("mixer");
+
+		if (mx != NULL) {
+			mx->HandleInputline("rate=44100");
+			mx->HandleInputline("blocksize=1024");
+		}
 	}
 
 	printk("[dbx] config sections up (core=dynamic), starting init cascade\n");
