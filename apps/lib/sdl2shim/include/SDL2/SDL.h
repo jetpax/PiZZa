@@ -22,6 +22,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <wchar.h>
 
 #ifdef __cplusplus
@@ -49,6 +50,7 @@ typedef enum { SDL_FALSE = 0, SDL_TRUE = 1 } SDL_bool;
 #define SDL_wcslen  wcslen
 #define SDL_free    free
 #define SDL_malloc  malloc
+#define SDL_arraysize(a) (sizeof(a) / sizeof((a)[0]))
 
 char *SDL_iconv_string(const char *tocode, const char *fromcode,
 		       const char *inbuf, size_t inbytesleft);
@@ -62,10 +64,14 @@ char *SDL_iconv_string(const char *tocode, const char *fromcode,
 static inline Uint16 SDL_Swap16(Uint16 x) { return (Uint16)__builtin_bswap16(x); }
 static inline Uint32 SDL_Swap32(Uint32 x) { return __builtin_bswap32(x); }
 
+static inline Uint64 SDL_Swap64(Uint64 x) { return __builtin_bswap64(x); }
+
 #define SDL_SwapLE16(x) ((Uint16)(x))
 #define SDL_SwapLE32(x) ((Uint32)(x))
+#define SDL_SwapLE64(x) ((Uint64)(x))
 #define SDL_SwapBE16(x) SDL_Swap16(x)
 #define SDL_SwapBE32(x) SDL_Swap32(x)
+#define SDL_SwapBE64(x) SDL_Swap64(x)
 
 /* ── version ─────────────────────────────────────────────────── */
 
@@ -108,6 +114,8 @@ int SDL_InitSubSystem(Uint32 flags);
 void SDL_QuitSubSystem(Uint32 flags);
 void SDL_Quit(void);
 const char *SDL_GetError(void);
+int SDL_SetError(const char *fmt, ...);
+void SDL_ClearError(void);
 
 #define SDL_HINT_RENDER_SCALE_QUALITY        "SDL_RENDER_SCALE_QUALITY"
 #define SDL_HINT_RENDER_VSYNC                "SDL_RENDER_VSYNC"
@@ -183,6 +191,8 @@ SDL_Surface *SDL_CreateRGBSurface(Uint32 flags, int width, int height, int depth
 void SDL_FreeSurface(SDL_Surface *surface);
 int SDL_LockSurface(SDL_Surface *surface);
 void SDL_UnlockSurface(SDL_Surface *surface);
+/* shim surfaces are plain malloc'd pixels; locking is never required */
+#define SDL_MUSTLOCK(S) 0
 int SDL_FillRect(SDL_Surface *dst, const SDL_Rect *rect, Uint32 color);
 int SDL_BlitSurface(SDL_Surface *src, const SDL_Rect *srcrect,
 		    SDL_Surface *dst, SDL_Rect *dstrect);
@@ -204,6 +214,8 @@ Uint32 SDL_MapRGBA(const SDL_PixelFormat *format, Uint8 r, Uint8 g, Uint8 b, Uin
 SDL_PixelFormat *SDL_AllocFormat(Uint32 pixel_format);
 void SDL_FreeFormat(SDL_PixelFormat *format);
 const char *SDL_GetPixelFormatName(Uint32 format);
+SDL_Palette *SDL_AllocPalette(int ncolors);
+void SDL_FreePalette(SDL_Palette *palette);
 
 /* ── window / renderer / texture ─────────────────────────────── */
 
@@ -247,6 +259,29 @@ void SDL_RaiseWindow(SDL_Window *window);
 void SDL_SetWindowGrab(SDL_Window *window, SDL_bool grabbed);
 int SDL_GetDisplayBounds(int displayIndex, SDL_Rect *rect);
 
+/* window-surface presentation (DOSBox-X output=surface path); the
+ * backing implementation is app-local like the rest of the video path.
+ */
+SDL_Surface *SDL_GetWindowSurface(SDL_Window *window);
+int SDL_UpdateWindowSurface(SDL_Window *window);
+int SDL_UpdateWindowSurfaceRects(SDL_Window *window, const SDL_Rect *rects, int numrects);
+
+/* fixed-mode display queries (DOSBox-X window management, all no-op
+ * or constant on the one fullscreen "display")
+ */
+typedef struct SDL_DisplayMode {
+	Uint32 format;
+	int w, h;
+	int refresh_rate;
+	void *driverdata;
+} SDL_DisplayMode;
+void SDL_SetWindowPosition(SDL_Window *window, int x, int y);
+void SDL_SetWindowMinimumSize(SDL_Window *window, int min_w, int min_h);
+void SDL_SetWindowSize(SDL_Window *window, int w, int h);
+int SDL_GetNumVideoDisplays(void);
+int SDL_GetDesktopDisplayMode(int displayIndex, SDL_DisplayMode *mode);
+int SDL_GetCurrentDisplayMode(int displayIndex, SDL_DisplayMode *mode);
+
 /* Environment/clipboard control stubs Mini vMac's OSGLUSDL references
  * (app-dir + pref-dir ROM search, clipboard). All stubbed in shim_stub.c.
  */
@@ -254,6 +289,7 @@ char *SDL_GetBasePath(void);
 char *SDL_GetPrefPath(const char *org, const char *app);
 char *SDL_GetClipboardText(void);
 int SDL_SetClipboardText(const char *text);
+SDL_bool SDL_HasClipboardText(void);
 
 SDL_Renderer *SDL_CreateRenderer(SDL_Window *window, int index, Uint32 flags);
 SDL_Texture *SDL_CreateTexture(SDL_Renderer *renderer, Uint32 format, int access, int w, int h);
@@ -345,6 +381,7 @@ typedef enum {
 	SDL_SCANCODE_KP_7 = 95, SDL_SCANCODE_KP_8 = 96, SDL_SCANCODE_KP_9 = 97,
 	SDL_SCANCODE_KP_0 = 98,
 	SDL_SCANCODE_KP_PERIOD = 99,
+	SDL_SCANCODE_NONUSBACKSLASH = 100,
 	SDL_SCANCODE_APPLICATION = 101,
 	SDL_SCANCODE_MUTE = 127,
 	SDL_SCANCODE_VOLUMEUP = 128,
@@ -394,6 +431,7 @@ typedef Sint32 SDL_Keycode;
 #define SDLK_SCANCODE_MASK      (1 << 30)
 #define SDL_SCANCODE_TO_KEYCODE(sc) ((sc) | SDLK_SCANCODE_MASK)
 
+#define SDLK_UNKNOWN 0
 #define SDLK_RETURN  '\r'
 #define SDLK_ESCAPE  '\x1b'
 #define SDLK_SPACE   ' '
@@ -414,6 +452,30 @@ typedef Sint32 SDL_Keycode;
 #define SDLK_RSHIFT  SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_RSHIFT)
 #define SDLK_LALT    SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_LALT)
 #define SDLK_RALT    SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_RALT)
+#define SDLK_TAB       '\t'
+#define SDLK_BACKSPACE '\b'
+#define SDLK_DELETE    '\x7f'
+#define SDLK_HOME      SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_HOME)
+#define SDLK_END       SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_END)
+#define SDLK_PAGEUP    SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_PAGEUP)
+#define SDLK_PAGEDOWN  SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_PAGEDOWN)
+#define SDLK_INSERT    SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_INSERT)
+#define SDLK_KP_0      SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_0)
+#define SDLK_KP_1      SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_1)
+#define SDLK_KP_2      SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_2)
+#define SDLK_KP_3      SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_3)
+#define SDLK_KP_4      SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_4)
+#define SDLK_KP_5      SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_5)
+#define SDLK_KP_6      SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_6)
+#define SDLK_KP_7      SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_7)
+#define SDLK_KP_8      SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_8)
+#define SDLK_KP_9      SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_9)
+#define SDLK_KP_PERIOD   SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_PERIOD)
+#define SDLK_KP_ENTER    SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_ENTER)
+#define SDLK_KP_PLUS     SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_PLUS)
+#define SDLK_KP_MINUS    SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_MINUS)
+#define SDLK_KP_MULTIPLY SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_MULTIPLY)
+#define SDLK_KP_DIVIDE   SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_KP_DIVIDE)
 
 typedef enum {
 	KMOD_NONE   = 0x0000,
@@ -425,6 +487,9 @@ typedef enum {
 	KMOD_RALT   = 0x0200,
 	KMOD_LGUI   = 0x0400,
 	KMOD_RGUI   = 0x0800,
+	KMOD_NUM    = 0x1000,
+	KMOD_CAPS   = 0x2000,
+	KMOD_MODE   = 0x4000,
 } SDL_Keymod;
 
 #define KMOD_SHIFT (KMOD_LSHIFT | KMOD_RSHIFT)
@@ -440,6 +505,9 @@ typedef struct SDL_Keysym {
 
 const Uint8 *SDL_GetKeyboardState(int *numkeys);
 const char *SDL_GetScancodeName(SDL_Scancode scancode);
+SDL_Keymod SDL_GetModState(void);
+SDL_Scancode SDL_GetScancodeFromKey(SDL_Keycode key);
+SDL_Keycode SDL_GetKeyFromScancode(SDL_Scancode scancode);
 
 /* ── events ──────────────────────────────────────────────────── */
 
@@ -454,8 +522,12 @@ enum {
 	SDL_MOUSEBUTTONUP = 0x402,
 	SDL_MOUSEWHEEL = 0x403,
 	SDL_JOYAXISMOTION = 0x600,
+	SDL_JOYHATMOTION = 0x602,
 	SDL_JOYBUTTONDOWN = 0x603,
 	SDL_JOYBUTTONUP = 0x604,
+	SDL_FINGERDOWN = 0x700,
+	SDL_FINGERUP = 0x701,
+	SDL_FINGERMOTION = 0x702,
 	SDL_CONTROLLERAXISMOTION = 0x650,
 	SDL_CONTROLLERBUTTONDOWN = 0x651,
 	SDL_CONTROLLERBUTTONUP = 0x652,
@@ -531,11 +603,33 @@ typedef struct SDL_MouseButtonEvent {
 	Uint32 type;
 	Uint32 timestamp;
 	Uint32 windowID;
+	Uint32 which;
 	Uint8 button;
 	Uint8 state;
 	Uint8 clicks;
 	Sint32 x, y;
 } SDL_MouseButtonEvent;
+
+#define SDL_TOUCH_MOUSEID ((Uint32)-1)
+
+typedef struct SDL_TouchFingerEvent {
+	Uint32 type;
+	Uint32 timestamp;
+	Sint64 touchId;
+	Sint64 fingerId;
+	float x, y;
+	float dx, dy;
+	float pressure;
+	Uint32 windowID;
+} SDL_TouchFingerEvent;
+
+typedef struct SDL_JoyHatEvent {
+	Uint32 type;
+	Uint32 timestamp;
+	Sint32 which;
+	Uint8 hat;
+	Uint8 value;
+} SDL_JoyHatEvent;
 
 typedef struct SDL_MouseWheelEvent {
 	Uint32 type;
@@ -610,6 +704,8 @@ typedef union SDL_Event {
 	SDL_DropEvent drop;
 	SDL_JoyAxisEvent jaxis;
 	SDL_JoyButtonEvent jbutton;
+	SDL_JoyHatEvent jhat;
+	SDL_TouchFingerEvent tfinger;
 	SDL_ControllerAxisEvent caxis;
 	SDL_ControllerButtonEvent cbutton;
 	SDL_ControllerDeviceEvent cdevice;
@@ -628,6 +724,8 @@ void SDL_SetTextInputRect(const SDL_Rect *rect);
 
 #define SDL_ENABLE  1
 #define SDL_DISABLE 0
+#define SDL_QUERY  -1
+#define SDL_IGNORE  0
 int SDL_ShowCursor(int toggle);
 
 /* ── timing ──────────────────────────────────────────────────── */
@@ -647,9 +745,20 @@ SDL_bool SDL_RemoveTimer(SDL_TimerID id);
 typedef Uint16 SDL_AudioFormat;
 
 #define AUDIO_U8     0x0008
+#define AUDIO_S8     0x8008
+#define AUDIO_U16LSB 0x0010
+#define AUDIO_U16MSB 0x1010
+#define AUDIO_U16    AUDIO_U16LSB
+#define AUDIO_U16SYS AUDIO_U16LSB
 #define AUDIO_S16LSB 0x8010
+#define AUDIO_S16MSB 0x9010
+#define AUDIO_S16    AUDIO_S16LSB
 #define AUDIO_S16SYS AUDIO_S16LSB
 #define SDL_AUDIO_ALLOW_FREQUENCY_CHANGE 0x00000001
+#define SDL_AUDIO_ALLOW_FORMAT_CHANGE    0x00000002
+#define SDL_AUDIO_ALLOW_CHANNELS_CHANGE  0x00000004
+#define SDL_AUDIO_ALLOW_SAMPLES_CHANGE   0x00000008
+#define SDL_AUDIO_ALLOW_ANY_CHANGE       0x0000000F
 
 typedef struct SDL_AudioSpec {
 	int freq;
@@ -688,6 +797,18 @@ void SDL_PauseAudio(int pause_on);
 void SDL_LockAudio(void);
 void SDL_UnlockAudio(void);
 SDL_AudioStatus SDL_GetAudioStatus(void);
+
+/* device-granular audio API (single device 1 on the shim) */
+typedef Uint32 SDL_AudioDeviceID;
+SDL_AudioDeviceID SDL_OpenAudioDevice(const char *device, int iscapture,
+				      const SDL_AudioSpec *desired,
+				      SDL_AudioSpec *obtained, int allowed_changes);
+void SDL_CloseAudioDevice(SDL_AudioDeviceID dev);
+void SDL_PauseAudioDevice(SDL_AudioDeviceID dev, int pause_on);
+void SDL_LockAudioDevice(SDL_AudioDeviceID dev);
+void SDL_UnlockAudioDevice(SDL_AudioDeviceID dev);
+SDL_AudioStatus SDL_GetAudioDeviceStatus(SDL_AudioDeviceID dev);
+
 int SDL_BuildAudioCVT(SDL_AudioCVT *cvt,
 		      SDL_AudioFormat src_format, Uint8 src_channels, int src_rate,
 		      SDL_AudioFormat dst_format, Uint8 dst_channels, int dst_rate);
@@ -704,6 +825,8 @@ void SDL_MixAudioFormat(Uint8 *dst, const Uint8 *src, SDL_AudioFormat format,
 
 typedef struct SDL_mutex SDL_mutex;
 typedef struct SDL_cond SDL_cond;
+typedef unsigned long SDL_threadID;
+SDL_threadID SDL_ThreadID(void);
 
 SDL_mutex *SDL_CreateMutex(void);
 void SDL_DestroyMutex(SDL_mutex *mutex);
@@ -758,6 +881,10 @@ typedef Sint32 SDL_JoystickID;
 #define SDL_HAT_RIGHT    0x02
 #define SDL_HAT_DOWN     0x04
 #define SDL_HAT_LEFT     0x08
+#define SDL_HAT_RIGHTUP   (SDL_HAT_RIGHT | SDL_HAT_UP)
+#define SDL_HAT_RIGHTDOWN (SDL_HAT_RIGHT | SDL_HAT_DOWN)
+#define SDL_HAT_LEFTUP    (SDL_HAT_LEFT | SDL_HAT_UP)
+#define SDL_HAT_LEFTDOWN  (SDL_HAT_LEFT | SDL_HAT_DOWN)
 
 typedef enum {
 	SDL_CONTROLLER_AXIS_LEFTX = 0,
@@ -802,8 +929,11 @@ void SDL_JoystickClose(SDL_Joystick *joystick);
  * (NumJoysticks == 0) and the game TUs build with -Wno-int-conversion.
  */
 const char *SDL_JoystickName(SDL_Joystick *joystick);
+const char *SDL_JoystickNameForIndex(int device_index);
 int SDL_JoystickNumAxes(SDL_Joystick *joystick);
 int SDL_JoystickNumHats(SDL_Joystick *joystick);
+int SDL_JoystickNumButtons(SDL_Joystick *joystick);
+void SDL_JoystickUpdate(void);
 Sint16 SDL_JoystickGetAxis(SDL_Joystick *joystick, int axis);
 Uint8 SDL_JoystickGetButton(SDL_Joystick *joystick, int button);
 Uint8 SDL_JoystickGetHat(SDL_Joystick *joystick, int hat);

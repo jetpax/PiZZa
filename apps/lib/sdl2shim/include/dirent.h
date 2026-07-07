@@ -15,7 +15,13 @@
 extern "C" {
 #endif
 
+/* d_type values (DOSBox-X drive_local checks d_type == DT_REG) */
+#define DT_UNKNOWN 0
+#define DT_DIR     4
+#define DT_REG     8
+
 struct dirent {
+	unsigned char d_type;
 	char d_name[256];
 };
 
