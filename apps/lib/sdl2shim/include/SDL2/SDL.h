@@ -199,6 +199,10 @@ int SDL_SetPaletteColors(SDL_Palette *palette, const SDL_Color *colors,
 			 int firstcolor, int ncolors);
 Uint32 SDL_MapRGB(const SDL_PixelFormat *format, Uint8 r, Uint8 g, Uint8 b);
 Uint32 SDL_MapRGBA(const SDL_PixelFormat *format, Uint8 r, Uint8 g, Uint8 b, Uint8 a);
+/* Mini vMac builds its 1bpp->ARGB CLUT with SDL_AllocFormat(ARGB8888) +
+ * SDL_MapRGB. Implemented app-local (minivmac_video.c). */
+SDL_PixelFormat *SDL_AllocFormat(Uint32 pixel_format);
+void SDL_FreeFormat(SDL_PixelFormat *format);
 const char *SDL_GetPixelFormatName(Uint32 format);
 
 /* ── window / renderer / texture ─────────────────────────────── */
@@ -238,11 +242,28 @@ Uint32 SDL_GetWindowFlags(SDL_Window *window);
 int SDL_SetWindowFullscreen(SDL_Window *window, Uint32 flags);
 void SDL_SetWindowTitle(SDL_Window *window, const char *title);
 void SDL_SetWindowIcon(SDL_Window *window, SDL_Surface *icon);
+void SDL_GetWindowPosition(SDL_Window *window, int *x, int *y);
+void SDL_RaiseWindow(SDL_Window *window);
+void SDL_SetWindowGrab(SDL_Window *window, SDL_bool grabbed);
+int SDL_GetDisplayBounds(int displayIndex, SDL_Rect *rect);
+
+/* Environment/clipboard control stubs Mini vMac's OSGLUSDL references
+ * (app-dir + pref-dir ROM search, clipboard). All stubbed in shim_stub.c.
+ */
+char *SDL_GetBasePath(void);
+char *SDL_GetPrefPath(const char *org, const char *app);
+char *SDL_GetClipboardText(void);
+int SDL_SetClipboardText(const char *text);
 
 SDL_Renderer *SDL_CreateRenderer(SDL_Window *window, int index, Uint32 flags);
 SDL_Texture *SDL_CreateTexture(SDL_Renderer *renderer, Uint32 format, int access, int w, int h);
 int SDL_UpdateTexture(SDL_Texture *texture, const SDL_Rect *rect,
 		      const void *pixels, int pitch);
+/* Streaming-texture present (Mini vMac locks, writes ARGB, unlocks). The
+ * implementation is app-local alongside the renderer (minivmac_video.c). */
+int SDL_LockTexture(SDL_Texture *texture, const SDL_Rect *rect,
+		    void **pixels, int *pitch);
+void SDL_UnlockTexture(SDL_Texture *texture);
 int SDL_RenderClear(SDL_Renderer *renderer);
 int SDL_RenderCopy(SDL_Renderer *renderer, SDL_Texture *texture,
 		   const SDL_Rect *srcrect, const SDL_Rect *dstrect);
@@ -338,6 +359,28 @@ typedef enum {
 	SDL_SCANCODE_RALT = 230,
 	SDL_SCANCODE_RGUI = 231,
 	SDL_SCANCODE_AUDIOMUTE = 262,
+	/* Edit keys + hex keypad + AC_HOME: Mini vMac's SDLScan2MacKeyCode
+	 * table switches on these. Most are absent on a Mac Plus keyboard, but
+	 * the switch must compile. Values are the upstream SDL2 / USB-HID
+	 * usage numbers.
+	 */
+	SDL_SCANCODE_KP_EQUALS = 103,
+	SDL_SCANCODE_HELP = 117,
+	SDL_SCANCODE_UNDO = 122,
+	SDL_SCANCODE_CUT = 123,
+	SDL_SCANCODE_COPY = 124,
+	SDL_SCANCODE_PASTE = 125,
+	SDL_SCANCODE_KP_COMMA = 133,
+	SDL_SCANCODE_KP_BACKSPACE = 187,
+	SDL_SCANCODE_KP_A = 188,
+	SDL_SCANCODE_KP_B = 189,
+	SDL_SCANCODE_KP_C = 190,
+	SDL_SCANCODE_KP_D = 191,
+	SDL_SCANCODE_KP_E = 192,
+	SDL_SCANCODE_KP_F = 193,
+	SDL_SCANCODE_KP_CLEAR = 216,
+	SDL_SCANCODE_KP_DECIMAL = 220,
+	SDL_SCANCODE_AC_HOME = 269,
 	SDL_NUM_SCANCODES = 512,
 } SDL_Scancode;
 
@@ -418,6 +461,7 @@ enum {
 	SDL_CONTROLLERBUTTONUP = 0x652,
 	SDL_CONTROLLERDEVICEADDED = 0x653,
 	SDL_CONTROLLERDEVICEREMOVED = 0x654,
+	SDL_DROPFILE = 0x1000,
 	SDL_USEREVENT = 0x8000,
 	SDL_LASTEVENT = 0xFFFF,
 };
@@ -428,7 +472,10 @@ enum {
 	SDL_WINDOWEVENT_SIZE_CHANGED = 6,
 	SDL_WINDOWEVENT_MINIMIZED = 7,
 	SDL_WINDOWEVENT_RESTORED = 9,
+	SDL_WINDOWEVENT_ENTER = 10,
+	SDL_WINDOWEVENT_LEAVE = 11,
 	SDL_WINDOWEVENT_FOCUS_GAINED = 12,
+	SDL_WINDOWEVENT_FOCUS_LOST = 13,
 };
 
 #define SDL_BUTTON_LEFT   1
@@ -469,6 +516,16 @@ typedef struct SDL_TextInputEvent {
 	Uint32 windowID;
 	char text[SDL_TEXTINPUTEVENT_TEXT_SIZE];
 } SDL_TextInputEvent;
+
+typedef struct SDL_MouseMotionEvent {
+	Uint32 type;
+	Uint32 timestamp;
+	Uint32 windowID;
+	Uint32 which;
+	Uint32 state;
+	Sint32 x, y;
+	Sint32 xrel, yrel;
+} SDL_MouseMotionEvent;
 
 typedef struct SDL_MouseButtonEvent {
 	Uint32 type;
@@ -525,6 +582,13 @@ typedef struct SDL_ControllerDeviceEvent {
 	Sint32 which;
 } SDL_ControllerDeviceEvent;
 
+typedef struct SDL_DropEvent {
+	Uint32 type;
+	Uint32 timestamp;
+	char *file;
+	Uint32 windowID;
+} SDL_DropEvent;
+
 typedef struct SDL_UserEvent {
 	Uint32 type;
 	Uint32 timestamp;
@@ -540,8 +604,10 @@ typedef union SDL_Event {
 	SDL_WindowEvent window;
 	SDL_KeyboardEvent key;
 	SDL_TextInputEvent text;
+	SDL_MouseMotionEvent motion;
 	SDL_MouseButtonEvent button;
 	SDL_MouseWheelEvent wheel;
+	SDL_DropEvent drop;
 	SDL_JoyAxisEvent jaxis;
 	SDL_JoyButtonEvent jbutton;
 	SDL_ControllerAxisEvent caxis;
@@ -552,8 +618,10 @@ typedef union SDL_Event {
 } SDL_Event;
 
 int SDL_PollEvent(SDL_Event *event);
+int SDL_WaitEvent(SDL_Event *event);
 int SDL_PushEvent(SDL_Event *event);
 Uint32 SDL_GetMouseState(int *x, int *y);
+void SDL_WarpMouseInWindow(SDL_Window *window, int x, int y);
 void SDL_StartTextInput(void);
 void SDL_StopTextInput(void);
 void SDL_SetTextInputRect(const SDL_Rect *rect);
