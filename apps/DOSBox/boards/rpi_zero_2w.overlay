@@ -1,0 +1,50 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * PiZZa DOSBox-X overlay for rpi_zero_2w.
+ *
+ *   - &mbox0 + &firmware: VC mailbox + property tags (FB alloc).
+ *   - &vc_fb: HDMI framebuffer pinned at a fixed 640x400 virtual mode;
+ *     dosbox_present_display.c nearest-neighbor scales each DOSBox video
+ *     mode into it and the VideoCore HVS scales 640x400 to the cable.
+ *     DOOM presents at 640x400, so its frames land 1:1. 640 * 4 = 2560
+ *     bytes/row = 64-byte aligned, so the FB driver's contiguous-DMA
+ *     fast path engages.
+ *   - &dma: BCM2835 DMA (backbuffer -> fb blit).
+ *   - mini-UART (uart1) console + LOG target, PiZZa convention.
+ */
+
+#include <zephyr/dt-bindings/display/panel.h>
+
+&mbox0 {
+	status = "okay";
+};
+
+&firmware {
+	status = "okay";
+};
+
+&dma {
+	status = "okay";
+};
+
+&vc_fb {
+	pixel-format = <PANEL_PIXEL_FORMAT_ARGB_8888>;
+	render-width = <640>;
+	render-height = <400>;
+	status = "okay";
+};
+
+/ {
+	chosen {
+		zephyr,console = &uart1;
+		zephyr,display = &vc_fb;
+	};
+};
+
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_gpio14>;
+	status = "okay";
+	current-speed = <115200>;
+};
