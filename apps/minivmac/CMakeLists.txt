@@ -102,6 +102,11 @@ if(CONFIG_MINIVMAC_SCRIPTED_INPUT)
   list(APPEND MINIVMAC_SHIM_SRC src/minivmac_scripted.c)
 endif()
 
+# Persistent disk backing on a mounted FATFS volume (SD card / RAM-FAT).
+if(CONFIG_MINIVMAC_DISK_FS)
+  list(APPEND MINIVMAC_SHIM_SRC src/minivmac_storage.c)
+endif()
+
 # ── ROM bake (§5): raw .incbin into rodata ──────────────────────────
 if(NOT DEFINED MINIVMAC_ROM)
   set(MINIVMAC_ROM "${MINIVMAC_SRC_DIR}/extras/roms/vMac.ROM")

@@ -38,6 +38,38 @@ config MINIVMAC_SCRIPTED_INPUT
 	bool "Drive Mini vMac from a scripted synthetic input source"
 	default n
 
+config MINIVMAC_DISK_FS
+	bool "Back the boot disk with a file on a mounted FATFS (SD card)"
+	default n
+	select DISK_ACCESS
+	select FILE_SYSTEM
+	select FAT_FILESYSTEM_ELM
+	help
+	  Store the .dsk as a real file (minivmac.dsk) on a FATFS volume -- the
+	  microSD card on rpi_zero_2w -- instead of a non-persistent RAM overlay,
+	  so guest OS writes survive a reboot. Seeded from the embedded floppy on
+	  first run. Falls back to the RAM overlay if the mount fails, so it is
+	  safe to leave on where no card is present.
+
+config MINIVMAC_FS_MOUNT
+	string "FATFS mount point / ELM volume holding the disk file"
+	depends on MINIVMAC_DISK_FS
+	default "/SD:"
+	help
+	  The disk-access volume to mount, e.g. "/SD:" for the SD card
+	  (zephyr,sdmmc-disk disk-name "SD") or "/RAM:" for a RAM-backed FAT disk
+	  on qemu. minivmac.dsk is stored at <mount>/minivmac.dsk.
+
+config MINIVMAC_DISK_SELFTEST
+	bool "Verify the disk round-trip against the embedded seed at boot"
+	depends on MINIVMAC_DISK_FS
+	default n
+	help
+	  Debug aid: after mounting + seeding, read the whole disk back from the
+	  volume and diff it against the embedded floppy, logging OK or the
+	  corrupt sectors on the console. Confirms whether the storage driver's
+	  data path round-trips faithfully.
+
 endmenu
 
 source "Kconfig.zephyr"

@@ -2,19 +2,20 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * PiZZa Mini vMac -- embedded asset store: ROM (read-only) + boot disk
- * (writable RAM overlay).
+ * (writable).
  *
- * Both are linked into .rodata (minivmac_pack.S, .incbin); this file serves
- * them through a POSIX fd layer, so OSGLUSDL.c's fopen/fread/fwrite/fseek
- * (funnelled by picolibc tinystdio through open/read/write/lseek/close/
- * fstat) resolve here with no filesystem on the boot path and the Mini vMac
- * tree untouched.
+ * The ROM and a seed floppy are linked into .rodata (minivmac_pack.S,
+ * .incbin); this file serves them through a POSIX fd layer, so OSGLUSDL.c's
+ * fopen/fread/fwrite/fseek (funnelled by picolibc tinystdio through
+ * open/read/write/lseek/close/fstat) resolve here with no filesystem on the
+ * boot path and the Mini vMac tree untouched.
  *
  *  - ROM ("vMac.ROM"): read-only rodata. LoadMacRom() lands here.
- *  - Boot disk ("boot.dsk"): Sony_Insert1 opens it "rb+"; the guest OS writes
- *    to disk (desktop DB, prefs), so on first open the embedded image is
- *    copied into a heap buffer that reads/writes then hit. Non-persistent
- *    (writes lost on reboot); SD/FAT persistence is a later phase.
+ *  - Boot disk ("boot.dsk"): two backings, chosen at open time.
+ *      * CONFIG_MINIVMAC_DISK_FS: a real file on a mounted FATFS volume (the
+ *        SD card), via minivmac_storage.c -- writes PERSIST across reboot.
+ *      * otherwise / on mount failure: a heap RAM overlay copied from the
+ *        embedded floppy -- writable but non-persistent.
  */
 
 #include <zephyr/kernel.h>
@@ -28,6 +29,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#ifdef CONFIG_MINIVMAC_DISK_FS
+#include "minivmac_storage.h"
+#endif
+
 extern const uint8_t minivmac_rom_start[];
 extern const uint8_t minivmac_rom_end[];
 extern const uint8_t minivmac_disk_start[];
@@ -39,7 +44,8 @@ extern const uint8_t minivmac_disk_end[];
 enum fd_kind {
 	FD_FREE = 0,
 	FD_ROM,
-	FD_DISK,
+	FD_DISK_RAM,
+	FD_DISK_SD,
 };
 
 static struct {
@@ -47,7 +53,7 @@ static struct {
 	enum fd_kind kind;
 } fds[MINIVMAC_FD_MAX];
 
-/* Writable RAM overlay for the boot disk, materialized on first open. */
+/* RAM overlay for the boot disk, materialized on first open (fallback path). */
 static uint8_t *disk_ram;
 static size_t disk_len;
 
@@ -83,10 +89,7 @@ static bool is_disk(const char *path)
 	return ends_with(path, "boot.dsk");
 }
 
-/* Copy the embedded image into a heap buffer the first time the disk is
- * opened; later opens (re-insert) reuse it so writes persist for the session.
- */
-static bool disk_ready(void)
+static bool disk_ram_ready(void)
 {
 	if (disk_ram == NULL) {
 		disk_len = disk_image_size();
@@ -104,11 +107,17 @@ int open(const char *path, int flags, ...)
 	enum fd_kind kind;
 
 	if (is_disk(path)) {
-		if (disk_image_size() == 0 || !disk_ready()) {
+#ifdef CONFIG_MINIVMAC_DISK_FS
+		if (minivmac_storage_disk_init() == 0) {
+			kind = FD_DISK_SD;
+		} else
+#endif
+		if (disk_image_size() == 0 || !disk_ram_ready()) {
 			errno = ENOENT;
 			return -1;
+		} else {
+			kind = FD_DISK_RAM;
 		}
-		kind = FD_DISK;   /* read or write both OK (RAM-backed) */
 	} else if ((flags & O_ACCMODE) != O_RDONLY) {
 		errno = EROFS;
 		return -1;
@@ -142,7 +151,16 @@ static int fd_slot(int fd)
 
 static size_t slot_size(int i)
 {
-	return (fds[i].kind == FD_DISK) ? disk_len : rom_size();
+	switch (fds[i].kind) {
+#ifdef CONFIG_MINIVMAC_DISK_FS
+	case FD_DISK_SD:
+		return minivmac_storage_disk_size();
+#endif
+	case FD_DISK_RAM:
+		return disk_len;
+	default:
+		return rom_size();
+	}
 }
 
 int close(int fd)
@@ -166,7 +184,20 @@ ssize_t read(int fd, void *buf, size_t count)
 		return -1;
 	}
 
-	const uint8_t *src = (fds[i].kind == FD_DISK) ? disk_ram : minivmac_rom_start;
+#ifdef CONFIG_MINIVMAC_DISK_FS
+	if (fds[i].kind == FD_DISK_SD) {
+		ssize_t n = minivmac_storage_disk_read(buf, count, fds[i].pos);
+
+		if (n < 0) {
+			errno = EIO;
+			return -1;
+		}
+		fds[i].pos += (size_t)n;
+		return n;
+	}
+#endif
+
+	const uint8_t *src = (fds[i].kind == FD_DISK_RAM) ? disk_ram : minivmac_rom_start;
 	size_t avail = slot_size(i) - fds[i].pos;
 	size_t n = MIN(count, avail);
 
@@ -183,7 +214,21 @@ ssize_t write(int fd, const void *buf, size_t count)
 		errno = EBADF;
 		return -1;
 	}
-	if (fds[i].kind != FD_DISK) {
+
+#ifdef CONFIG_MINIVMAC_DISK_FS
+	if (fds[i].kind == FD_DISK_SD) {
+		ssize_t n = minivmac_storage_disk_write(buf, count, fds[i].pos);
+
+		if (n < 0) {
+			errno = EIO;
+			return -1;
+		}
+		fds[i].pos += (size_t)n;
+		return n;
+	}
+#endif
+
+	if (fds[i].kind != FD_DISK_RAM) {
 		errno = EROFS;
 		return -1;
 	}
@@ -247,7 +292,7 @@ int fstat(int fd, struct stat *st)
 	}
 	memset(st, 0, sizeof(*st));
 	st->st_size = (off_t)slot_size(i);
-	st->st_mode = S_IFREG | ((fds[i].kind == FD_DISK) ? 0644 : 0444);
+	st->st_mode = S_IFREG | ((fds[i].kind == FD_ROM) ? 0444 : 0644);
 	return 0;
 }
 
