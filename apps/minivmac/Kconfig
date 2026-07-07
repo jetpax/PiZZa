@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# PiZZa Mini vMac port -- app options. Backend choices are the seams the
+# app's CMakeLists uses to pick the present TU.
+
+# SAMPLE_USBD_* options for sample_usbd_init.c on boards with the USB
+# device stack (rpi_zero_2w), same as the Doom / SDLPoP ports.
+source "samples/subsys/usb/common/Kconfig.sample_usbd"
+
+rsource "../lib/sdl2shim/Kconfig"
+
+menu "PiZZa Mini vMac port"
+
+choice MINIVMAC_PRESENT_BACKEND
+	prompt "Frame present backend"
+	default MINIVMAC_PRESENT_DISPLAY if DISPLAY
+	default MINIVMAC_PRESENT_NONE
+
+config MINIVMAC_PRESENT_DISPLAY
+	bool "Zephyr display API (bcm2835_fb + HVS scaling on hardware)"
+	depends on DISPLAY
+
+config MINIVMAC_PRESENT_NONE
+	bool "Drop frames (link/sim bring-up)"
+
+config MINIVMAC_PRESENT_SEMIHOST
+	bool "Semihosting PPM capture (qemu sim gates)"
+	depends on SEMIHOST
+
+endchoice
+
+config MINIVMAC_CAPTURE_EVERY
+	int "Capture every Nth presented frame (0 = first frame only)"
+	depends on MINIVMAC_PRESENT_SEMIHOST
+	default 0
+
+config MINIVMAC_SCRIPTED_INPUT
+	bool "Drive Mini vMac from a scripted synthetic input source"
+	default n
+
+endmenu
+
+source "Kconfig.zephyr"
