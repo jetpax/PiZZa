@@ -21,7 +21,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include "pop_shim.h"
+#include "sdl2shim.h"
 
 LOG_MODULE_REGISTER(pop_video, CONFIG_SDLPOP_LOG_LEVEL);
 
@@ -55,7 +55,7 @@ SDL_Renderer *SDL_CreateRenderer(SDL_Window *window, int index, Uint32 flags)
 	the_renderer.logical_w = 320;
 	the_renderer.logical_h = 200;
 
-	int rc = pop_present_init(320, 200);
+	int rc = s2s_present_init(320, 200);
 
 	if (rc != 0) {
 		LOG_WRN("present backend init failed (%d); frames will drop", rc);
@@ -99,7 +99,7 @@ SDL_Texture *SDL_CreateTexture(SDL_Renderer *renderer, Uint32 format, int access
 		bpp = 4;
 		break;
 	default:
-		pop_set_error("CreateTexture: unsupported format %u", format);
+		s2s_set_error("CreateTexture: unsupported format %u", format);
 		return NULL;
 	}
 
@@ -113,7 +113,7 @@ SDL_Texture *SDL_CreateTexture(SDL_Renderer *renderer, Uint32 format, int access
 		t->pitch = w * bpp;
 		t->pixels = calloc((size_t)t->pitch, (size_t)h);
 		if (t->pixels == NULL) {
-			pop_set_error("CreateTexture: out of memory (%dx%d)", w, h);
+			s2s_set_error("CreateTexture: out of memory (%dx%d)", w, h);
 			return NULL;
 		}
 		t->format = format;
@@ -125,7 +125,7 @@ SDL_Texture *SDL_CreateTexture(SDL_Renderer *renderer, Uint32 format, int access
 		return t;
 	}
 
-	pop_set_error("CreateTexture: pool exhausted");
+	s2s_set_error("CreateTexture: pool exhausted");
 	return NULL;
 }
 
@@ -133,11 +133,11 @@ int SDL_UpdateTexture(SDL_Texture *texture, const SDL_Rect *rect,
 		      const void *pixels, int pitch)
 {
 	if (texture == NULL || pixels == NULL) {
-		pop_set_error("UpdateTexture: NULL texture/pixels");
+		s2s_set_error("UpdateTexture: NULL texture/pixels");
 		return -1;
 	}
 	if (rect != NULL) {
-		pop_set_error("UpdateTexture: partial updates unsupported");
+		s2s_set_error("UpdateTexture: partial updates unsupported");
 		return -1;
 	}
 
@@ -166,7 +166,7 @@ int SDL_RenderCopy(SDL_Renderer *renderer, SDL_Texture *texture,
 	ARG_UNUSED(srcrect);
 	ARG_UNUSED(dstrect);
 	if (texture == NULL) {
-		pop_set_error("RenderCopy: NULL texture");
+		s2s_set_error("RenderCopy: NULL texture");
 		return -1;
 	}
 	renderer->present_src = texture;
@@ -189,7 +189,7 @@ void SDL_RenderPresent(SDL_Renderer *renderer)
 		 */
 		return;
 	}
-	pop_present_frame(t->pixels, t->pitch);
+	s2s_present_frame(t->pixels, t->pitch);
 }
 
 int SDL_SetRenderTarget(SDL_Renderer *renderer, SDL_Texture *texture)
@@ -197,7 +197,7 @@ int SDL_SetRenderTarget(SDL_Renderer *renderer, SDL_Texture *texture)
 	ARG_UNUSED(renderer);
 	ARG_UNUSED(texture);
 	/* TARGETTEXTURE is not advertised; SDLPoP never takes this path. */
-	pop_set_error("SetRenderTarget: unsupported");
+	s2s_set_error("SetRenderTarget: unsupported");
 	return -1;
 }
 

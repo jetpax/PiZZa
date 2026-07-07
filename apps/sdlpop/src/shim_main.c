@@ -11,7 +11,7 @@
 #include <zephyr/kernel.h>
 #include <stdio.h>
 
-#include "pop_shim.h"
+#include "sdl2shim.h"
 
 int main(void)
 {
@@ -31,11 +31,11 @@ int main(void)
 	printf("[sdlpop] PiZZa SDLPoP port, board %s\n", CONFIG_BOARD);
 
 	if (IS_ENABLED(CONFIG_SDLPOP_VIDEO_SELFTEST)) {
-		pop_video_selftest();
+		s2s_video_selftest();
 	}
 
 	if (IS_ENABLED(CONFIG_SDLPOP_SCRIPTED_INPUT)) {
-		pop_scripted_input_start();
+		s2s_scripted_input_start();
 	}
 
 	printf("[sdlpop] starting game\n");

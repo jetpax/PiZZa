@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Host harness for the HDMI-audio core (work order M0 gate). Compiles
-# the freestanding src/audio modules with the host compiler and runs
-# the bit-exact framing / resampler / ring / pump tests.
+# the freestanding audio modules with the host compiler and runs the
+# bit-exact framing / resampler / ring / pump tests. The audio core now
+# lives in the shared shim (apps/lib/sdl2shim).
 
-AUDIO_SRC := ../../src/audio
+AUDIO_SRC := ../../../lib/sdl2shim/src/audio
 
 CFLAGS := -O2 -std=c11 -Wall -Wextra -I$(AUDIO_SRC)
 SRCS := harness.c \

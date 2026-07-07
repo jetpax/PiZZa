@@ -19,7 +19,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include "pop_shim.h"
+#include "sdl2shim.h"
 
 LOG_MODULE_REGISTER(pop_scripted, CONFIG_SDLPOP_LOG_LEVEL);
 
@@ -57,7 +57,7 @@ static void push_key(SDL_Scancode sc, bool down)
 	ev.type = down ? SDL_KEYDOWN : SDL_KEYUP;
 	ev.key.state = down ? SDL_PRESSED : SDL_RELEASED;
 	ev.key.keysym.scancode = sc;
-	pop_event_submit(&ev);
+	s2s_event_submit(&ev);
 }
 
 static void scripted_run(void *a, void *b, void *c)
@@ -82,7 +82,7 @@ static void scripted_run(void *a, void *b, void *c)
 	LOG_INF("scripted: timeline complete");
 }
 
-void pop_scripted_input_start(void)
+void s2s_scripted_input_start(void)
 {
 	k_thread_create(&scripted_thread, scripted_stack,
 			K_THREAD_STACK_SIZEOF(scripted_stack),

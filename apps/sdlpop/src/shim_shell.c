@@ -25,7 +25,7 @@
 #include <string.h>
 #include <strings.h>   /* strcasecmp (picolibc keeps it here) */
 
-#include "pop_shim.h"
+#include "sdl2shim.h"
 
 struct keyname {
 	const char *name;
@@ -82,7 +82,7 @@ static void submit(SDL_Scancode sc, bool down)
 	ev.type = down ? SDL_KEYDOWN : SDL_KEYUP;
 	ev.key.state = down ? SDL_PRESSED : SDL_RELEASED;
 	ev.key.keysym.scancode = sc;
-	pop_event_submit(&ev);
+	s2s_event_submit(&ev);
 }
 
 static int arg_key(const struct shell *sh, char *arg, SDL_Scancode *out)
@@ -166,7 +166,7 @@ static int cmd_keys(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
-#ifdef CONFIG_SDLPOP_AUDIO_HDMI
+#ifdef CONFIG_SDL2SHIM_AUDIO_HDMI
 
 #include <zephyr/drivers/dma/dma_bcm2835.h>
 #include "audio/hdmi_audio.h"
@@ -178,13 +178,13 @@ static int cmd_keys(const struct shell *sh, size_t argc, char **argv)
  */
 static int cmd_audio(const struct shell *sh, size_t argc, char **argv)
 {
-	struct pop_audio_hdmi_stats stats;
+	struct s2s_audio_hdmi_stats stats;
 	struct hdmi_audio_hw_debug dbg;
 
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
-	pop_audio_hdmi_get_stats(&stats);
+	s2s_audio_hdmi_get_stats(&stats);
 	shell_print(sh, "state: %s%s%s  dma ch %d",
 		    stats.opened ? "open" : "closed",
 		    stats.tone_mode ? " [test tone]" : "",
@@ -228,14 +228,14 @@ static int cmd_audio_starve(const struct shell *sh, size_t argc, char **argv)
 		return -EINVAL;
 	}
 
-	pop_audio_hdmi_starve((unsigned int)blocks);
+	s2s_audio_hdmi_starve((unsigned int)blocks);
 	shell_print(sh, "starving feeder for %d blocks (%d ms) -- expect "
 		    "~%d underruns, then recovery; check `pop audio`",
 		    blocks, blocks * 4, blocks > 7 ? blocks - 7 : 0);
 	return 0;
 }
 
-#endif /* CONFIG_SDLPOP_AUDIO_HDMI */
+#endif /* CONFIG_SDL2SHIM_AUDIO_HDMI */
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_pop,
 	SHELL_CMD_ARG(key,  NULL, "<name>  -- tap (down+up), e.g. `pop key enter`", cmd_key, 2, 0),
@@ -243,7 +243,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_pop,
 	SHELL_CMD_ARG(up,   NULL, "<name>  -- release a held key", cmd_up, 2, 0),
 	SHELL_CMD_ARG(tap,  NULL, "<name> [ms]  -- hold then release (default 250 ms)", cmd_tap, 2, 1),
 	SHELL_CMD(keys,     NULL, "list key names", cmd_keys),
-#ifdef CONFIG_SDLPOP_AUDIO_HDMI
+#ifdef CONFIG_SDL2SHIM_AUDIO_HDMI
 	SHELL_CMD(audio,    NULL, "HDMI audio path diagnostics", cmd_audio),
 	SHELL_CMD_ARG(starve, NULL, "<blocks>  -- starve the audio ring (underrun demo)",
 		      cmd_audio_starve, 2, 0),

@@ -12,19 +12,19 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include "pop_shim.h"
+#include "sdl2shim.h"
 
 LOG_MODULE_REGISTER(pop_present, CONFIG_SDLPOP_LOG_LEVEL);
 
 static uint32_t frames;
 
-int pop_present_init(int width, int height)
+int s2s_present_init(int width, int height)
 {
 	LOG_INF("present: none backend (%dx%d frames dropped)", width, height);
 	return 0;
 }
 
-void pop_present_frame(const void *rgb24_pixels, int pitch)
+void s2s_present_frame(const void *rgb24_pixels, int pitch)
 {
 	ARG_UNUSED(rgb24_pixels);
 	ARG_UNUSED(pitch);

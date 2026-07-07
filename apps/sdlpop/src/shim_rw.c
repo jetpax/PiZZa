@@ -11,7 +11,7 @@
 
 #include <zephyr/kernel.h>
 
-#include "pop_shim.h"
+#include "sdl2shim.h"
 
 enum {
 	POP_RW_MEM = 1,
@@ -38,7 +38,7 @@ static Sint64 mem_seek(SDL_RWops *ctx, Sint64 offset, int whence)
 		target = ctx->mem.stop + offset;
 		break;
 	default:
-		pop_set_error("RW mem_seek: bad whence %d", whence);
+		s2s_set_error("RW mem_seek: bad whence %d", whence);
 		return -1;
 	}
 	if (target < ctx->mem.base) {
@@ -70,7 +70,7 @@ static size_t mem_read(SDL_RWops *ctx, void *ptr, size_t size, size_t maxnum)
 static size_t mem_write(SDL_RWops *ctx, const void *ptr, size_t size, size_t num)
 {
 	if (ctx->type == POP_RW_CONSTMEM) {
-		pop_set_error("RW mem_write: const memory");
+		s2s_set_error("RW mem_write: const memory");
 		return 0;
 	}
 
@@ -92,14 +92,14 @@ static int mem_close(SDL_RWops *ctx)
 static SDL_RWops *rw_from_mem(void *mem, int size, Uint32 type)
 {
 	if (mem == NULL || size <= 0) {
-		pop_set_error("RWFromMem: bad buffer");
+		s2s_set_error("RWFromMem: bad buffer");
 		return NULL;
 	}
 
 	SDL_RWops *rw = calloc(1, sizeof(*rw));
 
 	if (rw == NULL) {
-		pop_set_error("RWFromMem: out of memory");
+		s2s_set_error("RWFromMem: out of memory");
 		return NULL;
 	}
 	rw->size = mem_size;
@@ -128,7 +128,7 @@ SDL_RWops *SDL_RWFromFile(const char *file, const char *mode)
 {
 	ARG_UNUSED(mode);
 	/* PHASE1-STUB: file-backed RW (SDLPoP.cfg) lands with the FS phase */
-	pop_set_error("RWFromFile: no filesystem backend yet (%s)", file);
+	s2s_set_error("RWFromFile: no filesystem backend yet (%s)", file);
 	return NULL;
 }
 

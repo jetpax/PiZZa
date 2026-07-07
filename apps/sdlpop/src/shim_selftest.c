@@ -16,7 +16,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include "pop_shim.h"
+#include "sdl2shim.h"
 
 LOG_MODULE_REGISTER(pop_selftest, CONFIG_SDLPOP_LOG_LEVEL);
 
@@ -25,7 +25,7 @@ LOG_MODULE_REGISTER(pop_selftest, CONFIG_SDLPOP_LOG_LEVEL);
 #define POP_GMSK 0x0000FF00
 #define POP_BMSK 0x00FF0000
 
-void pop_video_selftest(void)
+void s2s_video_selftest(void)
 {
 	LOG_INF("selftest: video path");
 

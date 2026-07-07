@@ -21,7 +21,7 @@
 #include <zephyr/drivers/display.h>
 #include <zephyr/logging/log.h>
 
-#include "pop_shim.h"
+#include "sdl2shim.h"
 
 LOG_MODULE_REGISTER(pop_present, CONFIG_SDLPOP_LOG_LEVEL);
 
@@ -32,7 +32,7 @@ static const struct device *display_dev;
 static uint32_t backbuf[POP_W * POP_H];
 static bool ready;
 
-int pop_present_init(int width, int height)
+int s2s_present_init(int width, int height)
 {
 	if (width != POP_W || height != POP_H) {
 		LOG_ERR("present: %dx%d requested, backend is fixed %dx%d",
@@ -63,7 +63,7 @@ int pop_present_init(int width, int height)
 	return 0;
 }
 
-void pop_present_frame(const void *rgb24_pixels, int pitch)
+void s2s_present_frame(const void *rgb24_pixels, int pitch)
 {
 	if (!ready) {
 		return;

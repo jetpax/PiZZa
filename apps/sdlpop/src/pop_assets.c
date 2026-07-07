@@ -344,7 +344,7 @@ int access(const char *path, int mode)
 }
 
 /* Direct lookup for shim-internal users (IMG_Load). */
-const void *pop_asset_find(const char *path, size_t *size)
+const void *s2s_asset_find(const char *path, size_t *size)
 {
 	const struct pack_entry *e = pack_lookup(path);
 

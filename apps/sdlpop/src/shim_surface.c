@@ -14,9 +14,9 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include "pop_shim.h"
+#include "sdl2shim.h"
 
-LOG_MODULE_REGISTER(pop_surface, CONFIG_SDLPOP_LOG_LEVEL);
+LOG_MODULE_REGISTER(s2s_surface, CONFIG_SDLPOP_LOG_LEVEL);
 
 static Uint8 mask_shift(Uint32 mask)
 {
@@ -38,14 +38,14 @@ SDL_Surface *SDL_CreateRGBSurface(Uint32 flags, int width, int height, int depth
 	ARG_UNUSED(flags);
 
 	if (depth != 8 && depth != 24 && depth != 32) {
-		pop_set_error("CreateRGBSurface: unsupported depth %d", depth);
+		s2s_set_error("CreateRGBSurface: unsupported depth %d", depth);
 		return NULL;
 	}
 
-	struct pop_surface *ps = calloc(1, sizeof(*ps));
+	struct s2s_surface *ps = calloc(1, sizeof(*ps));
 
 	if (ps == NULL) {
-		pop_set_error("CreateRGBSurface: out of memory");
+		s2s_set_error("CreateRGBSurface: out of memory");
 		return NULL;
 	}
 
@@ -76,7 +76,7 @@ SDL_Surface *SDL_CreateRGBSurface(Uint32 flags, int width, int height, int depth
 
 	if (pixels == NULL) {
 		free(ps);
-		pop_set_error("CreateRGBSurface: out of memory (%dx%d@%d)",
+		s2s_set_error("CreateRGBSurface: out of memory (%dx%d@%d)",
 			      width, height, depth);
 		return NULL;
 	}
@@ -100,13 +100,13 @@ void SDL_FreeSurface(SDL_Surface *surface)
 		return;
 	}
 	free(surface->pixels);
-	free(POP_SURF(surface));
+	free(S2S_SURF(surface));
 }
 
 int SDL_LockSurface(SDL_Surface *surface)
 {
 	if (surface == NULL) {
-		pop_set_error("LockSurface: NULL surface");
+		s2s_set_error("LockSurface: NULL surface");
 		return -1;
 	}
 	return 0;
@@ -136,31 +136,31 @@ SDL_bool SDL_SetClipRect(SDL_Surface *surface, const SDL_Rect *rect)
 int SDL_SetColorKey(SDL_Surface *surface, int flag, Uint32 key)
 {
 	if (surface == NULL) {
-		pop_set_error("SetColorKey: NULL surface");
+		s2s_set_error("SetColorKey: NULL surface");
 		return -1;
 	}
-	POP_SURF(surface)->has_colorkey = (flag != 0);
-	POP_SURF(surface)->colorkey = key;
+	S2S_SURF(surface)->has_colorkey = (flag != 0);
+	S2S_SURF(surface)->colorkey = key;
 	return 0;
 }
 
 int SDL_SetSurfaceAlphaMod(SDL_Surface *surface, Uint8 alpha)
 {
 	if (surface == NULL) {
-		pop_set_error("SetSurfaceAlphaMod: NULL surface");
+		s2s_set_error("SetSurfaceAlphaMod: NULL surface");
 		return -1;
 	}
-	POP_SURF(surface)->alpha_mod = alpha;
+	S2S_SURF(surface)->alpha_mod = alpha;
 	return 0;
 }
 
 int SDL_SetSurfaceBlendMode(SDL_Surface *surface, SDL_BlendMode blendMode)
 {
 	if (surface == NULL) {
-		pop_set_error("SetSurfaceBlendMode: NULL surface");
+		s2s_set_error("SetSurfaceBlendMode: NULL surface");
 		return -1;
 	}
-	POP_SURF(surface)->blend = blendMode;
+	S2S_SURF(surface)->blend = blendMode;
 	return 0;
 }
 
@@ -168,11 +168,11 @@ int SDL_SetPaletteColors(SDL_Palette *palette, const SDL_Color *colors,
 			 int firstcolor, int ncolors)
 {
 	if (palette == NULL || colors == NULL) {
-		pop_set_error("SetPaletteColors: NULL palette");
+		s2s_set_error("SetPaletteColors: NULL palette");
 		return -1;
 	}
 	if (firstcolor < 0 || firstcolor + ncolors > palette->ncolors) {
-		pop_set_error("SetPaletteColors: range %d+%d out of %d",
+		s2s_set_error("SetPaletteColors: range %d+%d out of %d",
 			      firstcolor, ncolors, palette->ncolors);
 		return -1;
 	}
@@ -183,14 +183,14 @@ int SDL_SetPaletteColors(SDL_Palette *palette, const SDL_Color *colors,
 int SDL_SetSurfacePalette(SDL_Surface *surface, SDL_Palette *palette)
 {
 	if (surface == NULL || palette == NULL) {
-		pop_set_error("SetSurfacePalette: NULL arg");
+		s2s_set_error("SetSurfacePalette: NULL arg");
 		return -1;
 	}
 
-	struct pop_surface *ps = POP_SURF(surface);
+	struct s2s_surface *ps = S2S_SURF(surface);
 
 	if (surface->format->BitsPerPixel != 8) {
-		pop_set_error("SetSurfacePalette: not an indexed surface");
+		s2s_set_error("SetSurfacePalette: not an indexed surface");
 		return -1;
 	}
 
@@ -245,7 +245,7 @@ Uint32 SDL_MapRGB(const SDL_PixelFormat *format, Uint8 r, Uint8 g, Uint8 b)
 int SDL_FillRect(SDL_Surface *dst, const SDL_Rect *rect, Uint32 color)
 {
 	if (dst == NULL) {
-		pop_set_error("FillRect: NULL surface");
+		s2s_set_error("FillRect: NULL surface");
 		return -1;
 	}
 
@@ -296,7 +296,7 @@ int SDL_FillRect(SDL_Surface *dst, const SDL_Rect *rect, Uint32 color)
 /* Read one source pixel as RGBA + "skip" (colorkeyed under
  * BLENDMODE_NONE, SDL semantics).
  */
-static inline bool read_px(const struct pop_surface *ps, const Uint8 *p,
+static inline bool read_px(const struct s2s_surface *ps, const Uint8 *p,
 			   Uint8 *r, Uint8 *g, Uint8 *b, Uint8 *a)
 {
 	switch (ps->fmt.BytesPerPixel) {
@@ -339,7 +339,7 @@ static inline bool read_px(const struct pop_surface *ps, const Uint8 *p,
 	}
 }
 
-static inline void write_px(const struct pop_surface *pd, Uint8 *p,
+static inline void write_px(const struct s2s_surface *pd, Uint8 *p,
 			    Uint8 r, Uint8 g, Uint8 b, Uint8 a, SDL_BlendMode blend)
 {
 	if (blend == SDL_BLENDMODE_BLEND) {
@@ -375,7 +375,7 @@ static inline void write_px(const struct pop_surface *pd, Uint8 *p,
 
 	switch (pd->fmt.BytesPerPixel) {
 	case 1:
-		*p = (Uint8)SDL_MapRGB(&((struct pop_surface *)pd)->fmt, r, g, b);
+		*p = (Uint8)SDL_MapRGB(&((struct s2s_surface *)pd)->fmt, r, g, b);
 		break;
 	case 3:
 		p[0] = r;
@@ -395,12 +395,12 @@ int SDL_BlitSurface(SDL_Surface *src, const SDL_Rect *srcrect,
 		    SDL_Surface *dst, SDL_Rect *dstrect)
 {
 	if (src == NULL || dst == NULL) {
-		pop_set_error("BlitSurface: NULL surface");
+		s2s_set_error("BlitSurface: NULL surface");
 		return -1;
 	}
 
-	const struct pop_surface *ps = POP_SURF(src);
-	const struct pop_surface *pd = POP_SURF(dst);
+	const struct s2s_surface *ps = S2S_SURF(src);
+	const struct s2s_surface *pd = S2S_SURF(dst);
 
 	SDL_Rect sr = (srcrect != NULL) ? *srcrect : (SDL_Rect){ 0, 0, src->w, src->h };
 	int dx = (dstrect != NULL) ? dstrect->x : 0;
@@ -490,12 +490,12 @@ int SDL_BlitScaled(SDL_Surface *src, const SDL_Rect *srcrect,
 		   SDL_Surface *dst, SDL_Rect *dstrect)
 {
 	if (src == NULL || dst == NULL) {
-		pop_set_error("BlitScaled: NULL surface");
+		s2s_set_error("BlitScaled: NULL surface");
 		return -1;
 	}
 
-	const struct pop_surface *ps = POP_SURF(src);
-	const struct pop_surface *pd = POP_SURF(dst);
+	const struct s2s_surface *ps = S2S_SURF(src);
+	const struct s2s_surface *pd = S2S_SURF(dst);
 
 	SDL_Rect sr = (srcrect != NULL) ? *srcrect : (SDL_Rect){ 0, 0, src->w, src->h };
 	SDL_Rect dr = (dstrect != NULL) ? *dstrect : (SDL_Rect){ 0, 0, dst->w, dst->h };
@@ -539,7 +539,7 @@ SDL_Surface *SDL_ConvertSurfaceFormat(SDL_Surface *src, Uint32 pixel_format, Uin
 	ARG_UNUSED(flags);
 
 	if (src == NULL) {
-		pop_set_error("ConvertSurfaceFormat: NULL surface");
+		s2s_set_error("ConvertSurfaceFormat: NULL surface");
 		return NULL;
 	}
 
@@ -555,15 +555,15 @@ SDL_Surface *SDL_ConvertSurfaceFormat(SDL_Surface *src, Uint32 pixel_format, Uin
 					   0x000000FF, 0x0000FF00, 0x00FF0000, 0);
 		break;
 	default:
-		pop_set_error("ConvertSurfaceFormat: unsupported target %u", pixel_format);
+		s2s_set_error("ConvertSurfaceFormat: unsupported target %u", pixel_format);
 		return NULL;
 	}
 	if (out == NULL) {
 		return NULL;
 	}
 
-	const struct pop_surface *ps = POP_SURF(src);
-	const struct pop_surface *po = POP_SURF(out);
+	const struct s2s_surface *ps = S2S_SURF(src);
+	const struct s2s_surface *po = S2S_SURF(out);
 	int sbpp = ps->fmt.BytesPerPixel;
 	int obpp = po->fmt.BytesPerPixel;
 
@@ -598,7 +598,7 @@ SDL_Surface *SDL_ConvertSurface(SDL_Surface *src, const SDL_PixelFormat *fmt, Ui
 	ARG_UNUSED(flags);
 
 	if (src == NULL || fmt == NULL) {
-		pop_set_error("ConvertSurface: NULL arg");
+		s2s_set_error("ConvertSurface: NULL arg");
 		return NULL;
 	}
 
@@ -621,11 +621,11 @@ SDL_Surface *SDL_ConvertSurface(SDL_Surface *src, const SDL_PixelFormat *fmt, Ui
 			       (size_t)src->w * src->format->BytesPerPixel);
 		}
 		if (src->format->BitsPerPixel == 8) {
-			memcpy(POP_SURF(out)->colors, POP_SURF(src)->colors,
-			       sizeof(POP_SURF(out)->colors));
+			memcpy(S2S_SURF(out)->colors, S2S_SURF(src)->colors,
+			       sizeof(S2S_SURF(out)->colors));
 		}
-		struct pop_surface *po = POP_SURF(out);
-		struct pop_surface *psrc = POP_SURF(src);
+		struct s2s_surface *po = S2S_SURF(out);
+		struct s2s_surface *psrc = S2S_SURF(src);
 
 		po->has_colorkey = psrc->has_colorkey;
 		po->colorkey = psrc->colorkey;

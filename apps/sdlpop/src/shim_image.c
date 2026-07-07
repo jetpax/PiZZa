@@ -14,7 +14,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/byteorder.h>
 
-#include "pop_shim.h"
+#include "sdl2shim.h"
 #include <SDL2/SDL_image.h>
 
 /* SDLPoP's LE masks (types.h). */
@@ -46,7 +46,7 @@ static SDL_Surface *pimg_to_surface(const uint8_t *blob, size_t size)
 	const struct pimg_header *hdr = (const struct pimg_header *)blob;
 
 	if (size < sizeof(*hdr) || memcmp(hdr->magic, "PIMG", 4) != 0) {
-		pop_set_error("IMG: not a PIMG blob (%zu bytes)", size);
+		s2s_set_error("IMG: not a PIMG blob (%zu bytes)", size);
 		return NULL;
 	}
 
@@ -74,7 +74,7 @@ static SDL_Surface *pimg_to_surface(const uint8_t *blob, size_t size)
 		row_bytes = (size_t)w * 4;
 		break;
 	default:
-		pop_set_error("IMG: unknown PIMG kind %d", hdr->kind);
+		s2s_set_error("IMG: unknown PIMG kind %d", hdr->kind);
 		return NULL;
 	}
 
@@ -82,7 +82,7 @@ static SDL_Surface *pimg_to_surface(const uint8_t *blob, size_t size)
 		return NULL;
 	}
 	if ((size_t)(pixels - blob) + row_bytes * h > size) {
-		pop_set_error("IMG: truncated PIMG (%dx%d kind %d, %zu bytes)",
+		s2s_set_error("IMG: truncated PIMG (%dx%d kind %d, %zu bytes)",
 			      w, h, hdr->kind, size);
 		SDL_FreeSurface(surf);
 		return NULL;
@@ -111,7 +111,7 @@ static SDL_Surface *pimg_to_surface(const uint8_t *blob, size_t size)
 SDL_Surface *IMG_Load_RW(SDL_RWops *src, int freesrc)
 {
 	if (src == NULL) {
-		pop_set_error("IMG_Load_RW: NULL rwops");
+		s2s_set_error("IMG_Load_RW: NULL rwops");
 		return NULL;
 	}
 
@@ -134,11 +134,11 @@ SDL_Surface *IMG_Load_RW(SDL_RWops *src, int freesrc)
 				surf = pimg_to_surface(buf, (size_t)size);
 				free(buf);
 			} else {
-				pop_set_error("IMG_Load_RW: out of memory");
+				s2s_set_error("IMG_Load_RW: out of memory");
 			}
 		}
 	} else {
-		pop_set_error("IMG_Load_RW: empty stream");
+		s2s_set_error("IMG_Load_RW: empty stream");
 	}
 
 	if (freesrc) {
@@ -150,10 +150,10 @@ SDL_Surface *IMG_Load_RW(SDL_RWops *src, int freesrc)
 SDL_Surface *IMG_Load(const char *file)
 {
 	size_t size;
-	const void *blob = pop_asset_find(file, &size);
+	const void *blob = s2s_asset_find(file, &size);
 
 	if (blob == NULL) {
-		pop_set_error("IMG_Load: %s not in asset pack", file);
+		s2s_set_error("IMG_Load: %s not in asset pack", file);
 		return NULL;
 	}
 	return pimg_to_surface(blob, size);
@@ -168,6 +168,6 @@ int IMG_SavePNG(SDL_Surface *surface, const char *file)
 {
 	ARG_UNUSED(surface);
 	ARG_UNUSED(file);
-	pop_set_error("IMG_SavePNG: screenshots not supported");
+	s2s_set_error("IMG_SavePNG: screenshots not supported");
 	return -1;
 }
