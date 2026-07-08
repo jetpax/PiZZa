@@ -26,7 +26,7 @@
 #include <zephyr/bluetooth/classic/classic.h>
 
 #include "hogp.h"
-#include "bthid_br.h"
+#include "btinput.h"
 
 #define HCI_OP_READ_LOCAL_NAME 0x0c14
 
@@ -187,24 +187,10 @@ static void br_hid_fallback(struct k_work *work)
 {
 	ARG_UNUSED(work);
 
-	if (br_conn != NULL && !bthid_br_active()) {
+	if (br_conn != NULL && !btinput_hid_active()) {
 		printk("BR-HID: pad opened no channels; host-initiating\n");
-		bthid_br_start(br_conn);
+		btinput_hid_start(br_conn);
 	}
-}
-
-static enum bt_br_conn_req_rsp br_conn_req(const bt_addr_t *addr, uint32_t cod)
-{
-	char str[BT_ADDR_STR_LEN];
-
-	bt_addr_to_str(addr, str, sizeof(str));
-	printk("BR incoming connection from %s (CoD 0x%06x) -- accepting as central\n",
-	       str, cod);
-	/* Canonical HID topology: host = central. Accepting as peripheral left
-	 * the pad opening no channels AND ignoring our CONNECT_REQs (observed
-	 * 2026-07-08); the working outbound session had us central.
-	 */
-	return BT_BR_CONN_REQ_ACCEPT_CENTRAL;
 }
 
 static void br_page(struct k_work *work)
@@ -483,7 +469,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	if (br_conn == conn) {
 		k_work_cancel_delayable(&br_hid_fallback_work);
 		br_inbound = false;
-		bthid_br_stop();
+		btinput_hid_stop();
 		bt_conn_unref(br_conn);
 		br_conn = NULL;
 		k_work_schedule(&br_page_work, K_SECONDS(2));
@@ -546,7 +532,7 @@ static void security_changed(struct bt_conn *conn, bt_security_t level,
 			       "the pad's channel opens\n");
 			k_work_schedule(&br_hid_fallback_work, K_MSEC(750));
 		} else {
-			bthid_br_start(conn);
+			btinput_hid_start(conn);
 		}
 	} else {
 		hogp_start(conn);
@@ -584,6 +570,17 @@ static struct bt_conn_auth_info_cb auth_info_cb = {
 	.pairing_complete = pairing_complete,
 	.pairing_failed = pairing_failed,
 };
+
+/* --- input sink ---------------------------------------------------------- */
+
+/* btinput hands every key edge here (the M4 seam will translate to SDL /
+ * termdirect; the harness just prints, so HW keymap capture still works).
+ */
+static void key_print(uint8_t usage, bool pressed, void *user)
+{
+	ARG_UNUSED(user);
+	printk("    KEY 0x%02x %s\n", usage, pressed ? "DOWN" : "UP");
+}
 
 /* --- entry --------------------------------------------------------------- */
 
@@ -647,13 +644,14 @@ int main(void)
 	printk("Mac Bluetooth OFF (or pad forgotten) so it doesn't steal the link.\n");
 
 	/* Bonded Classic HID devices reconnect DEVICE-INITIATED: on power-on
-	 * the pad pages its last host and opens the L2CAP channels itself.
-	 * Be that host: page-scannable + HID PSM servers registered.
+	 * the pad pages its last host and opens the L2CAP channels itself. The
+	 * lib makes us that host -- page-scannable, PSM 0x11/0x13 servers,
+	 * inbound accepted as central. Key edges arrive via the sink above.
 	 */
-	bthid_br_register();
-	err = bt_br_set_connectable(true, br_conn_req);
-	if (err && err != -EALREADY) {
-		printk("bt_br_set_connectable failed (%d)\n", err);
+	btinput_set_key_cb(key_print, NULL);
+	err = btinput_init();
+	if (err) {
+		printk("btinput_init failed (%d)\n", err);
 	}
 
 	/* Host-initiated page still covers the first pairing (pad in pairing

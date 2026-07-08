@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# WO-BT-K1 harness -- app options. The reusable Classic HID host lives in
+# apps/lib/btinput; pull its Kconfig in so CONFIG_BTINPUT (+ its log module)
+# is known here, same as the games rsource ../lib/sdl2shim/Kconfig.
+
+rsource "../lib/btinput/Kconfig"
+
+source "Kconfig.zephyr"

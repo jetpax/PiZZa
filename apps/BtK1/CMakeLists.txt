@@ -1,7 +1,9 @@
 #
 # WO-BT-K1 — 8BitDo Micro BT keyboard input on PiZZa Zero 2W.
-# Bring-up vehicle / test harness for the Classic BT HID host; the reusable
-# capability (bthid_br + kbd_report) is destined for apps/lib once M4 lands.
+# Bring-up vehicle / test harness for the Classic BT HID host. The reusable
+# capability now lives in apps/lib/btinput (M4.1); this app links it like the
+# games link apps/lib/sdl2shim, and keeps only the LE sniffer (hogp.c) and the
+# scan/pair/connect orchestration it uses for bring-up.
 #
 cmake_minimum_required(VERSION 3.20.0)
 
@@ -27,9 +29,13 @@ if(NOT EXISTS "${_btk1_blob}")
     "It is gitignored (vendor blob) -- fetch it per firmware/PROVENANCE.md before building.")
 endif()
 
+# The Classic HID host + boot keyboard parser: shared library (M4.1).
+include(${CMAKE_CURRENT_SOURCE_DIR}/../lib/btinput/btinput.cmake)
+
 target_sources(app PRIVATE
   src/main.c
   src/hogp.c
-  src/bthid_br.c
-  src/kbd_report.c
+  ${BTINPUT_SOURCES}
 )
+
+target_include_directories(app PRIVATE ${BTINPUT_INCLUDE_DIRS})

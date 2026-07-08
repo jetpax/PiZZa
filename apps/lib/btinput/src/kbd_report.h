@@ -1,14 +1,14 @@
 /*
- * WO-BT-K1 M3 (T3.3) — boot-format keyboard report diff parser.
+ * apps/lib/btinput -- boot-format keyboard report diff parser.
  *
- * Pure code: no Zephyr dependencies, so the same file compiles in the
- * native_sim / host unit-test harness (T3.4).
+ * Pure code: no Zephyr dependencies, so the same file compiles in the host
+ * unit-test harness (tests/test_kbd_report.c).
  *
  * Input: 8-byte boot keyboard input reports (modifiers, reserved,
  * 6 keycodes). Key down/up events are derived by diffing consecutive
  * reports; the phantom/rollover report (keycodes all 0x01) is ignored;
  * kbd_report_release_all() synthesizes UP events for everything held
- * (link loss / pad sleep, T4.2).
+ * (link loss / device sleep).
  */
 
 #ifndef KBD_REPORT_H_

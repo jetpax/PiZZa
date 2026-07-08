@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# apps/lib/btinput -- Classic BT (BR/EDR) HID input host.
+#
+# CONFIG_BTINPUT is the single switch a consumer flips: it selects the Classic
+# BT host pieces the lib needs. The lib TUs register a log module against
+# CONFIG_BTINPUT_LOG_LEVEL. Board/policy tunables (aarch64 BT stack sizes,
+# BT_MAX_CONN/PAIRED, legacy pairing, the settings backend, the patchram blob
+# path) stay in the consuming app's prj.conf.
+#
+# Consuming apps pull this in with `rsource "../lib/btinput/Kconfig"`.
+
+menu "btinput (Bluetooth HID input)"
+
+config BTINPUT
+	bool "Bluetooth Classic HID input host"
+	select BT
+	select BT_CLASSIC
+	select BT_CENTRAL
+	select BT_SMP
+	select BT_BONDABLE
+	help
+	  A minimal Classic BT (BR/EDR) HID host: registers the PSM 0x11
+	  (control) + 0x13 (interrupt) L2CAP servers, accepts inbound HID
+	  links as central, and diffs boot keyboard reports into key up/down
+	  events delivered to a consumer-registered sink. Zephyr ships no HID
+	  host profile; this is it. Proven on rpi_zero_2w / CYW43436 with an
+	  8BitDo Micro.
+
+if BTINPUT
+
+module = BTINPUT
+module-str = btinput
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # BTINPUT
+
+endmenu

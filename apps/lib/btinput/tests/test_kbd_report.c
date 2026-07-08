@@ -1,6 +1,7 @@
 /*
- * WO-BT-K1 T3.4 — host-side unit tests for the boot-report diff parser.
- * Pure C, no Zephyr: build with `cc test_kbd_report.c ../src/kbd_report.c`.
+ * apps/lib/btinput -- host-side unit tests for the boot-report diff parser.
+ * Pure C, no Zephyr: build with
+ *   cc -Wall -o /tmp/t test_kbd_report.c ../src/kbd_report.c && /tmp/t
  * Vectors mirror behaviors observed on HW 2026-07-08 (triple-sent reports,
  * chords, release-on-disconnect) plus the spec edge cases (phantom rollover,
  * modifiers, short reports).
