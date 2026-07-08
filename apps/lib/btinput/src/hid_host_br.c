@@ -40,6 +40,15 @@ LOG_MODULE_REGISTER(btinput, CONFIG_BTINPUT_LOG_LEVEL);
 static struct bt_conn *hid_conn;
 static struct kbd_state kbd;
 
+/* True when WE opened the control channel (outbound / first pairing) and so
+ * must chain-open the interrupt channel from ctrl_connected. False on an
+ * inbound reconnect, where the pad opens BOTH channels itself -- host-opening
+ * intr there races the pad's open on the same static intr_chan (the accept
+ * memset zeroes the channel's live kernel rtx timeout -> timeout-queue
+ * corruption -> data abort in the timer ISR; HW 2026-07-08).
+ */
+static bool ctrl_host_opened;
+
 /* Consumer-registered key sink (the SDL/termdirect seam, or a test print). */
 static btinput_key_cb_t s_key_cb;
 static void *s_key_user;
@@ -127,6 +136,17 @@ static void ctrl_connected(struct bt_l2cap_chan *chan)
 {
 	int err;
 
+	/* Inbound reconnect: the pad opens the interrupt channel itself -- do
+	 * NOT host-open it (that races the pad's open on the same intr_chan and
+	 * corrupts the kernel timeout queue). Stay passive; the pad's open lands
+	 * in hid_server_accept -> intr_connected.
+	 */
+	if (!ctrl_host_opened) {
+		LOG_INF("HID control channel up (inbound) -- awaiting the pad's "
+			"interrupt channel");
+		return;
+	}
+
 	LOG_INF("HID control channel up; opening interrupt channel");
 
 	intr_chan.chan.ops = &intr_ops;
@@ -154,6 +174,9 @@ static int hid_server_accept(struct bt_conn *conn,
 
 	if (hid_conn == NULL) {
 		hid_conn = conn;
+		/* Device-initiated: the pad opens both channels, so ctrl_connected
+		 * must stay passive (no host-open of intr). */
+		ctrl_host_opened = false;
 		memset(&kbd, 0, sizeof(kbd));
 		LOG_INF("inbound reconnect (PSM 0x%04x)", server->psm);
 	}
@@ -225,6 +248,8 @@ void btinput_hid_start(struct bt_conn *conn)
 	memset(&intr_chan, 0, sizeof(intr_chan));
 	memset(&kbd, 0, sizeof(kbd));
 	hid_conn = conn;
+	/* We open control -> chain-open interrupt from ctrl_connected. */
+	ctrl_host_opened = true;
 
 	ctrl_chan.chan.ops = &ctrl_ops;
 	ctrl_chan.rx.mtu = 64;
