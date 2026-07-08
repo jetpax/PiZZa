@@ -179,6 +179,38 @@ static bool br_inbound;
 static struct k_work_delayable br_page_work;
 static struct k_work_delayable br_hid_fallback_work;
 
+/* True once a BR link key for the pad exists -- seeded at boot from the bond
+ * store, latched on the first successful encrypt.
+ *
+ * HW truth (2026-07-08, three flashes): the pad's DEVICE-INITIATED inbound
+ * reconnects are FLAKY -- most attempts die ~195 ms after the ACL comes up
+ * (pad drops 0x13; if our auth/encrypt hasn't finished by then it surfaces
+ * as security err 9 mid-SMP) -- while HOST-initiated (outbound page) sessions
+ * complete reliably. An inbound-only policy therefore never converges on a
+ * bad day; a boot-time blind page races the pad's own storm. Policy:
+ * inbound preferred (fastest when it works, and the pad initiates it anyway),
+ * outbound page armed as the RESCUE -- boot pages after a short grace,
+ * every BR disconnect re-arms a page, and an inbound connect CANCELS the
+ * pending page. Why the pad bails at ~195 ms on its own reconnects is an
+ * open question (prime suspect: it validates the host, e.g. SDP, and we
+ * register no HID-host records) -- parked for M4.x, not fixed by timing.
+ */
+static bool br_bonded;
+
+/* There is no public "is this BR address bonded?" API (bt_le_bond_exists is
+ * LE-only; bt_foreach_bond enumerates LE identities). bt_keys_find_link_key()
+ * -- subsys/bluetooth/host/keys.h, linked in with CONFIG_BT_CLASSIC -- is the
+ * honest stored-link-key check; forward-declared here rather than reaching
+ * into a host-internal header. Returns NULL when the address has no bond.
+ */
+struct bt_keys_link_key;
+extern struct bt_keys_link_key *bt_keys_find_link_key(const bt_addr_t *addr);
+
+static bool br_bond_exists(void)
+{
+	return bt_keys_find_link_key(&pad_br_addr) != NULL;
+}
+
 /* Inbound ACLs: the pad normally opens the HID channels itself. If it
  * hasn't within the grace period, host-initiate them (some devices page in
  * but expect host-opened channels).
@@ -197,6 +229,10 @@ static void br_page(struct k_work *work)
 {
 	ARG_UNUSED(work);
 
+	/* Covers first pairing AND the bonded rescue (the pad's own inbound
+	 * attempts usually die ~195 ms in; a host page always completes).
+	 * An inbound connect cancels this work before it fires.
+	 */
 	if (br_conn != NULL) {
 		return;
 	}
@@ -449,6 +485,10 @@ static void connected(struct bt_conn *conn, uint8_t err)
 		br_inbound = (br_conn == NULL);
 		if (br_inbound) {
 			br_conn = bt_conn_ref(conn);
+			/* The pad reconnected on its own -- retire any pending
+			 * first-pair page so it can't collide with this link.
+			 */
+			k_work_cancel_delayable(&br_page_work);
 		}
 	}
 
@@ -472,6 +512,10 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 		btinput_hid_stop();
 		bt_conn_unref(br_conn);
 		br_conn = NULL;
+		/* Re-arm the rescue page: if the pad's next inbound attempt dies
+		 * its ~195 ms death again, our page grabs it instead. A new
+		 * inbound connect cancels this before it fires.
+		 */
 		k_work_schedule(&br_page_work, K_SECONDS(2));
 		return;
 	}
@@ -527,6 +571,13 @@ static void security_changed(struct bt_conn *conn, bt_security_t level,
 	 * with a fallback.
 	 */
 	if (conn_is_br(conn)) {
+		/* Link key established/confirmed. No page work needed while this
+		 * link is up (disconnect re-arms the rescue).
+		 */
+		if (!br_bonded) {
+			br_bonded = true;
+		}
+		k_work_cancel_delayable(&br_page_work);
 		if (br_inbound) {
 			printk("BR-HID: inbound link secured -- waiting for "
 			       "the pad's channel opens\n");
@@ -654,11 +705,21 @@ int main(void)
 		printk("btinput_init failed (%d)\n", err);
 	}
 
-	/* Host-initiated page still covers the first pairing (pad in pairing
-	 * mode page-scans) and acts as a fallback.
-	 */
 	k_work_init_delayable(&br_page_work, br_page);
 	k_work_init_delayable(&br_hid_fallback_work, br_hid_fallback);
-	k_work_schedule(&br_page_work, K_NO_WAIT);
+
+	/* Unbonded: page immediately (first pairing, pad page-scans in pairing
+	 * mode). Bonded: give the pad's own inbound reconnect a short head
+	 * start, then page as the rescue -- its inbound attempts usually die
+	 * ~195 ms in (0x13), while our page reliably completes. An inbound
+	 * connect cancels the pending page.
+	 */
+	br_bonded = br_bond_exists();
+	if (br_bonded) {
+		printk("Pad is BR-bonded -- inbound preferred, rescue page armed\n");
+	} else {
+		printk("No BR bond -- paging the pad for first pairing\n");
+	}
+	k_work_schedule(&br_page_work, br_bonded ? K_SECONDS(2) : K_NO_WAIT);
 	return 0;
 }
