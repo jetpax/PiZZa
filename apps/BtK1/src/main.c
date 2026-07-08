@@ -25,14 +25,15 @@
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/classic/classic.h>
 
-#include "hogp.h"
 #include "btinput.h"
 
 #define HCI_OP_READ_LOCAL_NAME 0x0c14
 
 #define UUID16_HIDS            0x1812
-#define APPEARANCE_HID_GENERIC 0x03c0
-#define APPEARANCE_HID_KBD     0x03c1
+/* GAP appearance: the whole HID category (generic 0x03c0, keyboard 0x03c1,
+ * mouse 0x03c2, ... digitizer 0x03c8) -- the MX Master advertises as mouse.
+ */
+#define APPEARANCE_IS_HID(a) ((a) >= 0x03c0 && (a) <= 0x03cf)
 
 /* --- SD FAT mount for the settings file backend ------------------------- */
 
@@ -175,9 +176,7 @@ static const bt_addr_t pad_br_addr = {
 	.val = { 0x4f, 0x8c, 0x27, 0xd8, 0x17, 0xe4 },
 };
 static struct bt_conn *br_conn;
-static bool br_inbound;
 static struct k_work_delayable br_page_work;
-static struct k_work_delayable br_hid_fallback_work;
 
 /* True once a BR link key for the pad exists -- seeded at boot from the bond
  * store, latched on the first successful encrypt.
@@ -211,19 +210,91 @@ static bool br_bond_exists(void)
 	return bt_keys_find_link_key(&pad_br_addr) != NULL;
 }
 
-/* Inbound ACLs: the pad normally opens the HID channels itself. If it
- * hasn't within the grace period, host-initiate them (some devices page in
- * but expect host-opened channels).
+/* --- BR discovery: first-pair flow for a mouse (M4.3) ----------------------
+ * Mice pair host-ward: pairing button makes them discoverable, the host
+ * inquires and pages. One inquiry window at boot; any peripheral-major
+ * pointing device found gets paged (btinput then drives security + channels
+ * on the outbound conn). Bonded mice reconnect device-initiated afterwards,
+ * so this never needs to run again until a new mouse shows up.
  */
-static void br_hid_fallback(struct k_work *work)
+static struct bt_br_discovery_result disc_results[8];
+static struct bt_conn *disc_conns[2];
+static struct k_work disc_page_work;
+static bt_addr_t disc_page_target;
+
+/* Paging from the discovery callback context would block the BT RX path
+ * (bt_conn_create_br waits on a command status) -- do it from a work item.
+ */
+static void disc_page_fn(struct k_work *work)
 {
+	char str[BT_ADDR_STR_LEN];
+
 	ARG_UNUSED(work);
 
-	if (br_conn != NULL && !btinput_hid_active()) {
-		printk("BR-HID: pad opened no channels; host-initiating\n");
-		btinput_hid_start(br_conn);
+	for (int j = 0; j < ARRAY_SIZE(disc_conns); j++) {
+		if (disc_conns[j] == NULL) {
+			bt_addr_to_str(&disc_page_target, str, sizeof(str));
+			printk(">>> paging discovered pointing device %s\n", str);
+			disc_conns[j] = bt_conn_create_br(&disc_page_target,
+							  BT_BR_CONN_PARAM_DEFAULT);
+			if (disc_conns[j] == NULL) {
+				printk("page failed (create)\n");
+			}
+			return;
+		}
 	}
 }
+
+/* Drop our create-ref for a discovery-paged conn. */
+static bool disc_conn_release(struct bt_conn *conn)
+{
+	for (int j = 0; j < ARRAY_SIZE(disc_conns); j++) {
+		if (disc_conns[j] == conn) {
+			bt_conn_unref(disc_conns[j]);
+			disc_conns[j] = NULL;
+			return true;
+		}
+	}
+	return false;
+}
+
+static void disc_timeout(const struct bt_br_discovery_result *results,
+			 size_t count)
+{
+	char str[BT_ADDR_STR_LEN];
+	bool paged = false;
+
+	for (size_t i = 0; i < count; i++) {
+		uint32_t cod = sys_get_le24(results[i].cod);
+		bool pointing = ((cod >> 8) & 0x1f) == 0x05 && (cod & 0x80);
+
+		bt_addr_to_str(&results[i].addr, str, sizeof(str));
+		printk("INQ %s CoD 0x%06x %d dBm%s\n", str, cod,
+		       results[i].rssi, pointing ? "  [pointing]" : "");
+
+		if (pointing && !paged) {
+			paged = true;
+			disc_page_target = results[i].addr;
+			k_work_submit(&disc_page_work);
+		}
+	}
+	if (count == 0) {
+		printk("INQ: nothing discoverable found\n");
+	}
+
+	/* Inquiry over: arm the pad page policy and start the LE scan (both
+	 * would contend with inquiry for the radio). The LE scan is the
+	 * BLE-HID path: it has been off since the M3 Classic pivot, which
+	 * left btinput's HOGP backend unreachable -- a BLE mouse in pairing
+	 * mode advertised into the void (HW 2026-07-08).
+	 */
+	k_work_schedule(&br_page_work, K_SECONDS(1));
+	start_scan();
+}
+
+static struct bt_br_discovery_cb disc_cb = {
+	.timeout = disc_timeout,
+};
 
 static void br_page(struct k_work *work)
 {
@@ -240,8 +311,8 @@ static void br_page(struct k_work *work)
 	printk(">>> BR/EDR paging 8BitDo (E4:17:D8:27:8C:4F)...\n");
 	br_conn = bt_conn_create_br(&pad_br_addr, BT_BR_CONN_PARAM_DEFAULT);
 	if (br_conn == NULL) {
-		printk("bt_conn_create_br failed; retrying in 3 s\n");
-		k_work_schedule(&br_page_work, K_SECONDS(3));
+		printk("bt_conn_create_br failed; retrying in 3.5 s\n");
+		k_work_schedule(&br_page_work, K_MSEC(3500));
 	}
 }
 
@@ -373,9 +444,9 @@ static void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t adv_type,
 	bt_data_parse(ad, ad_parse_cb, &s);
 
 	pad_like = s.hid_uuid ||
-		   s.appearance == APPEARANCE_HID_KBD ||
-		   s.appearance == APPEARANCE_HID_GENERIC ||
+		   APPEARANCE_IS_HID(s.appearance) ||
 		   strncmp(s.name, "8BitDo", 6) == 0 ||
+		   strncmp(s.name, "MX", 2) == 0 ||
 		   is_8bitdo_oui(addr);
 	bonded = is_bonded_addr(addr);
 
@@ -403,9 +474,12 @@ static void scan_cb(const bt_addr_le_t *addr, int8_t rssi, uint8_t adv_type,
 	}
 
 	/* NONCONN / SCAN_IND can't be connected to; anything else HID-ish or
-	 * bonded is fair game (the pad's SCAN_RSP implies a connectable ADV_IND).
+	 * bonded is fair game -- EXCEPT the 8BitDo's LE face: it is bonded
+	 * (M2) but carries no HIDS (vendor config service only, proven), and
+	 * reconnecting it every ~10 s hogged the single LE-connect slot and
+	 * starved the real BLE mouse (HW 2026-07-08). Its keyboard is Classic.
 	 */
-	if ((pad_like || bonded) &&
+	if ((pad_like || bonded) && !is_8bitdo_oui(addr) &&
 	    adv_type != BT_GAP_ADV_TYPE_ADV_NONCONN_IND &&
 	    adv_type != BT_GAP_ADV_TYPE_ADV_SCAN_IND) {
 		connect_to(addr);
@@ -463,10 +537,13 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	if (err) {
 		printk("connect to %s (%s) failed (0x%02x)\n", str,
 		       br ? "BR" : "LE", err);
-		if (br && br_conn != NULL) {
+		if (br && disc_conn_release(conn)) {
+			/* Discovery-paged mouse: one-shot, no retry loop. */
+		} else if (br && br_conn == conn) {
 			bt_conn_unref(br_conn);
 			br_conn = NULL;
-			k_work_schedule(&br_page_work, K_SECONDS(3));
+			/* 3.5 s, off the pad's 2-3 s retry beat (see above). */
+			k_work_schedule(&br_page_work, K_MSEC(3500));
 		} else if (pad_conn != NULL) {
 			bt_conn_unref(pad_conn);
 			pad_conn = NULL;
@@ -475,21 +552,23 @@ static void connected(struct bt_conn *conn, uint8_t err)
 		return;
 	}
 
-	printk("CONNECTED %s (%s) -- elevating security (Just Works)\n", str,
-	       br ? "BR/EDR" : "LE");
+	printk("CONNECTED %s (%s)\n", str, br ? "BR/EDR" : "LE");
 
-	/* Track inbound BR connections (device-initiated reconnect) the same
-	 * way as our own pages, so disconnect handling stays uniform.
+	/* BR: btinput owns security + HID channels from here. The harness
+	 * only tracks the PAD's conn (by its Classic addr) for the rescue-
+	 * page policy; an inbound pad reconnect also retires any pending
+	 * page so it can't collide with the live link.
 	 */
 	if (br) {
-		br_inbound = (br_conn == NULL);
-		if (br_inbound) {
+		struct bt_conn_info info;
+
+		if (br_conn == NULL &&
+		    bt_conn_get_info(conn, &info) == 0 &&
+		    bt_addr_eq(info.br.dst, &pad_br_addr)) {
 			br_conn = bt_conn_ref(conn);
-			/* The pad reconnected on its own -- retire any pending
-			 * first-pair page so it can't collide with this link.
-			 */
 			k_work_cancel_delayable(&br_page_work);
 		}
+		return;
 	}
 
 	err = bt_conn_set_security(conn, BT_SECURITY_L2);
@@ -506,22 +585,34 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	conn_addr_str(conn, str, sizeof(str));
 	printk("DISCONNECTED %s (reason 0x%02x)\n", str, reason);
 
+	if (disc_conn_release(conn)) {
+		/* Discovery-paged mouse gone; bonded now, it reconnects
+		 * device-initiated (btinput is page-scannable).
+		 */
+		return;
+	}
+
 	if (br_conn == conn) {
-		k_work_cancel_delayable(&br_hid_fallback_work);
-		br_inbound = false;
-		btinput_hid_stop();
 		bt_conn_unref(br_conn);
 		br_conn = NULL;
-		/* Re-arm the rescue page: if the pad's next inbound attempt dies
-		 * its ~195 ms death again, our page grabs it instead. A new
-		 * inbound connect cancels this before it fires.
+		/* Re-arm the rescue page. 1.2 s, deliberately NOT ~2-3 s: the
+		 * pad retries its own inbound every 2-3 s, and a matching
+		 * cadence paged straight into its attempts forever (0x0b "ACL
+		 * exists" / 0x04 storm, M4.3 first HW run). Aim for the listen
+		 * window right after ITS attempt dies instead. An inbound
+		 * connect cancels this before it fires.
 		 */
-		k_work_schedule(&br_page_work, K_SECONDS(2));
+		k_work_schedule(&br_page_work, K_MSEC(1200));
+		return;
+	}
+
+	if (conn_is_br(conn)) {
+		/* Other BR device (inbound mouse): btinput handled teardown. */
 		return;
 	}
 
 	if (pad_conn == conn) {
-		hogp_stop();
+		/* btinput's LE backend released its own state on disconnect. */
 		bt_conn_unref(pad_conn);
 		pad_conn = NULL;
 	}
@@ -555,7 +646,14 @@ static void security_changed(struct bt_conn *conn, bt_security_t level,
 			}
 		}
 
-		retry_after = k_uptime_get() + 3000;
+		/* retry_after is the LE scan-connect cooldown ONLY. BR security
+		 * failures have their own policy (rescue page) -- letting the
+		 * pad's flaky inbound attempts bump this starved the BLE
+		 * mouse's connect retries (HW 2026-07-08).
+		 */
+		if (!conn_is_br(conn)) {
+			retry_after = k_uptime_get() + 3000;
+		}
 		bt_conn_disconnect(conn, BT_HCI_ERR_AUTH_FAIL);
 		return;
 	}
@@ -564,29 +662,25 @@ static void security_changed(struct bt_conn *conn, bt_security_t level,
 	       conn_is_br(conn) ? "BR/EDR" : "LE",
 	       settings_ok ? "persisted on /SD:" : "RAM ONLY (no SD)");
 
-	/* Act like a HID host now -- Classic HID on BR/EDR (the pad's real
-	 * keyboard), GATT sniffer/HOGP on LE. On INBOUND ACLs the pad opens
-	 * the channels itself -- initiating ours too collides in L2CAP
-	 * signaling ("Idents mismatch", pad drops after ~5 s). Stay passive
-	 * with a fallback.
+	/* BR: btinput drives the HID channels from here (passive on inbound,
+	 * host-open on outbound, per-slot fallback). The harness only latches
+	 * the pad's bond state for the rescue-page policy. LE: GATT sniffer.
 	 */
 	if (conn_is_br(conn)) {
-		/* Link key established/confirmed. No page work needed while this
-		 * link is up (disconnect re-arms the rescue).
-		 */
-		if (!br_bonded) {
+		if (conn == br_conn) {
 			br_bonded = true;
-		}
-		k_work_cancel_delayable(&br_page_work);
-		if (br_inbound) {
-			printk("BR-HID: inbound link secured -- waiting for "
-			       "the pad's channel opens\n");
-			k_work_schedule(&br_hid_fallback_work, K_MSEC(750));
-		} else {
-			btinput_hid_start(conn);
+			k_work_cancel_delayable(&br_page_work);
 		}
 	} else {
-		hogp_start(conn);
+		/* Secured LE link: hand it to btinput's HOGP backend. It
+		 * detaches itself from peers with no HIDS (e.g. the 8BitDo's
+		 * vendor-only LE face).
+		 */
+		int aerr = btinput_le_attach(conn);
+
+		if (aerr && aerr != -EALREADY) {
+			printk("btinput_le_attach failed (%d)\n", aerr);
+		}
 	}
 }
 
@@ -614,7 +708,10 @@ static void pairing_complete(struct bt_conn *conn, bool bonded)
 static void pairing_failed(struct bt_conn *conn, enum bt_security_err reason)
 {
 	printk("PAIRING FAILED: %s (reason %d)\n", sec_err_str(reason), reason);
-	retry_after = k_uptime_get() + 5000;
+	/* LE-only cooldown; BR has the rescue-page policy (see above). */
+	if (!conn_is_br(conn)) {
+		retry_after = k_uptime_get() + 5000;
+	}
 }
 
 static struct bt_conn_auth_info_cb auth_info_cb = {
@@ -633,6 +730,35 @@ static void key_print(uint8_t usage, bool pressed, void *user)
 	printk("    KEY 0x%02x %s\n", usage, pressed ? "DOWN" : "UP");
 }
 
+static void mouse_btn_print(uint8_t button, bool pressed, void *user)
+{
+	ARG_UNUSED(user);
+	printk("    MOUSE BTN%u %s\n", button, pressed ? "DOWN" : "UP");
+}
+
+/* Mouse motion arrives at report rate (~100 Hz) -- printing each line would
+ * swamp the 115200 console. Accumulate and print ~4x/s: proves deltas and
+ * sign without melting the UART.
+ */
+static void mouse_move_print(int dx, int dy, int wheel, void *user)
+{
+	static int64_t next;
+	static int adx, ady, awh;
+
+	ARG_UNUSED(user);
+
+	adx += dx;
+	ady += dy;
+	awh += wheel;
+
+	if (k_uptime_get() < next) {
+		return;
+	}
+	next = k_uptime_get() + 250;
+	printk("    MOUSE dx=%d dy=%d wh=%d (accum)\n", adx, ady, awh);
+	adx = ady = awh = 0;
+}
+
 /* --- entry --------------------------------------------------------------- */
 
 int main(void)
@@ -642,7 +768,7 @@ int main(void)
 	char str[BT_ADDR_LE_STR_LEN];
 	int err;
 
-	printk("\n=== WO-BT-K1 M3: HOGP keyboard client (Zero 2W) ===\n");
+	printk("\n=== WO-BT-K1 M4.3: multi-device BT HID harness (Zero 2W) ===\n");
 
 	storage_init();
 
@@ -695,31 +821,43 @@ int main(void)
 	printk("Mac Bluetooth OFF (or pad forgotten) so it doesn't steal the link.\n");
 
 	/* Bonded Classic HID devices reconnect DEVICE-INITIATED: on power-on
-	 * the pad pages its last host and opens the L2CAP channels itself. The
-	 * lib makes us that host -- page-scannable, PSM 0x11/0x13 servers,
-	 * inbound accepted as central. Key edges arrive via the sink above.
+	 * they page their last host and open the L2CAP channels themselves.
+	 * btinput makes us that host -- page-scannable, PSM 0x11/0x13 servers,
+	 * inbound accepted as central, N device slots -- and drives every BR
+	 * connection through security + channels. Events arrive via the sinks.
 	 */
 	btinput_set_key_cb(key_print, NULL);
+	btinput_set_mouse_cbs(mouse_btn_print, mouse_move_print, NULL);
 	err = btinput_init();
 	if (err) {
 		printk("btinput_init failed (%d)\n", err);
 	}
 
 	k_work_init_delayable(&br_page_work, br_page);
-	k_work_init_delayable(&br_hid_fallback_work, br_hid_fallback);
+	k_work_init(&disc_page_work, disc_page_fn);
+	bt_br_discovery_cb_register(&disc_cb);
 
-	/* Unbonded: page immediately (first pairing, pad page-scans in pairing
-	 * mode). Bonded: give the pad's own inbound reconnect a short head
-	 * start, then page as the rescue -- its inbound attempts usually die
-	 * ~195 ms in (0x13), while our page reliably completes. An inbound
-	 * connect cancels the pending page.
-	 */
 	br_bonded = br_bond_exists();
-	if (br_bonded) {
-		printk("Pad is BR-bonded -- inbound preferred, rescue page armed\n");
+	printk(br_bonded ? "Pad is BR-bonded -- inbound preferred, rescue page armed\n"
+			 : "No BR bond -- will page the pad for first pairing\n");
+
+	/* One inquiry window first (mouse first-pair; see disc_timeout), then
+	 * the pad page policy arms from its completion. Unbonded pad: page
+	 * covers first pairing. Bonded: pages act as the rescue -- the pad's
+	 * own inbound attempts usually die ~195 ms in (0x13), while our page
+	 * reliably completes; an inbound connect cancels the pending page.
+	 */
+	struct bt_br_discovery_param dp = { .length = 8, .limited = false };
+
+	err = bt_br_discovery_start(&dp, disc_results, ARRAY_SIZE(disc_results));
+	if (err) {
+		printk("BR inquiry failed (%d) -- skipping Classic-mouse discovery\n", err);
+		k_work_schedule(&br_page_work,
+				br_bonded ? K_SECONDS(2) : K_NO_WAIT);
+		start_scan();
 	} else {
-		printk("No BR bond -- paging the pad for first pairing\n");
+		printk("BR inquiry (~10 s); LE scan follows -- put the mouse in "
+		       "pairing mode (BLE mice show as ADV lines after ~10 s)\n");
 	}
-	k_work_schedule(&br_page_work, br_bonded ? K_SECONDS(2) : K_NO_WAIT);
 	return 0;
 }

@@ -32,9 +32,11 @@ endif()
 # The Classic HID host + boot keyboard parser: shared library (M4.1).
 include(${CMAKE_CURRENT_SOURCE_DIR}/../lib/btinput/btinput.cmake)
 
+# hogp.c (the M3 GATT sniffer) stays on disk as a bring-up tool but is no
+# longer compiled -- the lib's LE HOGP backend (CONFIG_BTINPUT_HOGP) is the
+# real input path now.
 target_sources(app PRIVATE
   src/main.c
-  src/hogp.c
   ${BTINPUT_SOURCES}
 )
 
