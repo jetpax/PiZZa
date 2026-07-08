@@ -29,6 +29,28 @@ config BTINPUT
 
 if BTINPUT
 
+config BTINPUT_MAX_DEVICES
+	int "Maximum concurrent HID devices"
+	default 3
+	range 1 7
+	help
+	  Device slots in the HID host (keyboard + mouse + spare = 3). Each
+	  slot holds two L2CAP channels and the parser state. The consuming
+	  app must budget CONFIG_BT_MAX_CONN / CONFIG_BT_MAX_PAIRED to match
+	  (those stay in prj.conf -- board/policy concerns).
+
+config BTINPUT_HOGP
+	bool "LE HOGP backend (BLE-only mice and keyboards)"
+	select BT_CENTRAL
+	select BT_GATT_CLIENT
+	select BT_GATT_AUTO_DISCOVER_CCC
+	help
+	  HID over GATT client for BLE-only devices (Logitech MX-series mice,
+	  modern BLE keyboards) -- they never appear on BR/EDR. The consumer
+	  connects + secures the LE link (scan policy is app-specific) and
+	  hands it to btinput_le_attach(); events arrive on the same sinks as
+	  the Classic path.
+
 module = BTINPUT
 module-str = btinput
 source "subsys/logging/Kconfig.template.log_config"

@@ -1,11 +1,14 @@
 /*
  * apps/lib/btinput -- reusable Bluetooth HID input for PiZZa apps.
  *
- * A minimal Classic BT (BR/EDR) HID host: Zephyr ships the BR/EDR ACL + SSP +
- * L2CAP machinery but no HID host profile, so this provides it (~150 lines
- * over two L2CAP channels). Boot keyboard reports are diffed to clean key
- * up/down events and handed to a consumer-registered sink -- the SDL /
- * termdirect seam, or a test print. Any PiZZa app links this the same way it
+ * A minimal Classic BT (BR/EDR) HID host for up to CONFIG_BTINPUT_MAX_DEVICES
+ * concurrent devices (keyboard + mouse + combos). Zephyr ships the BR/EDR
+ * ACL + SSP + L2CAP machinery but no HID host profile, so this provides it.
+ * The lib registers its own connection callbacks and owns the whole BR HID
+ * lifecycle: it claims every BR connection (inbound reconnects and
+ * consumer-paged first pairings alike), elevates security, opens/accepts the
+ * HID channels, parses boot keyboard/mouse reports, and hands clean events to
+ * the consumer-registered sinks below. Any PiZZa app links it the same way it
  * links apps/lib/sdl2shim:
  *
  *   CMakeLists.txt: include(../lib/btinput/btinput.cmake)
@@ -13,10 +16,14 @@
  *                   target_include_directories(app PRIVATE ${BTINPUT_INCLUDE_DIRS})
  *   prj.conf:       CONFIG_BTINPUT=y
  *                   CONFIG_AIROC_CUSTOM_FIRMWARE_HCD_BLOB="firmware/<patchram>.hcd"
- *   code:           btinput_init();   (once, after bt_enable())
+ *   code:           btinput_set_key_cb(...); btinput_init();  (after bt_enable())
  *
- * HW-proven on rpi_zero_2w / CYW43436 / 8BitDo Micro (K mode). See the memory
- * reference_zephyr_classic_hid_host for the hard-earned rules.
+ * Bonded HID devices then reconnect device-initiated with no further consumer
+ * code. First pairing is consumer policy: either page the device's Classic
+ * address (bt_conn_create_br -- the lib takes the connection over), or make
+ * the host discoverable via btinput_pair_mode() for devices that pair
+ * host-ward. HW-proven on rpi_zero_2w / CYW43436 / 8BitDo Micro; see the
+ * memory reference_zephyr_classic_hid_host for the hard-earned rules.
  */
 
 #ifndef BTINPUT_H_
@@ -24,8 +31,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-
-#include <zephyr/bluetooth/conn.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,31 +43,55 @@ extern "C" {
  */
 typedef void (*btinput_key_cb_t)(uint8_t usage, bool pressed, void *user);
 
+/**
+ * Mouse button sink. @p button follows boot-report bit order: 0 = left,
+ * 1 = right, 2 = middle (higher bits when the device reports them).
+ */
+typedef void (*btinput_mouse_btn_cb_t)(uint8_t button, bool pressed,
+				       void *user);
+
+/**
+ * Mouse motion sink: relative deltas from one report (never all-zero --
+ * idle keepalives are suppressed). @p wheel is 0 for 3-byte boot reports.
+ */
+typedef void (*btinput_mouse_move_cb_t)(int dx, int dy, int wheel, void *user);
+
 /** Register the sink for key events. Safe to call before or after init. */
 void btinput_set_key_cb(btinput_key_cb_t cb, void *user);
+
+/** Register the sinks for mouse events. Either may be NULL. */
+void btinput_set_mouse_cbs(btinput_mouse_btn_cb_t btn_cb,
+			   btinput_mouse_move_cb_t move_cb, void *user);
 
 /**
  * Bring up the Classic (BR/EDR) HID host: register the PSM 0x11 (control) +
  * 0x13 (interrupt) L2CAP servers and make the host connectable/page-scannable,
- * accepting inbound HID links as CENTRAL. Bonded HID devices reconnect
- * device-initiated (they page the host and open the channels themselves); the
- * host routes them internally. Call once after bt_enable(). Returns 0 on
- * success, negative errno otherwise.
+ * accepting inbound HID links as CENTRAL. From here the lib self-drives every
+ * BR connection through security, channel setup and teardown. Call once after
+ * bt_enable(). Returns 0 on success, negative errno otherwise.
  */
 int btinput_init(void);
 
 /**
- * Open the HID control+interrupt channels on a freshly-secured OUTBOUND
- * BR/EDR link (first pairing, or a manual re-page). Inbound reconnects need
- * no call -- the device opens the channels and the host routes them.
+ * Pairing window: make the host discoverable (inquiry-scannable) so NEW
+ * devices that pair host-ward can find it. Reconnection of bonded devices
+ * needs only connectable, which btinput_init() already provides. Consumer
+ * policy decides the window length.
  */
-void btinput_hid_start(struct bt_conn *conn);
+int btinput_pair_mode(bool enable);
 
-/** ACL gone: synthesize UP for every held key and forget channel state. */
-void btinput_hid_stop(void);
-
-/** True while a HID channel is up or being set up on the current ACL. */
-bool btinput_hid_active(void);
+/**
+ * LE HOGP backend (CONFIG_BTINPUT_HOGP): hand a connected + SECURED LE
+ * connection to the lib. It discovers HIDS, prefers boot protocol (fixed
+ * report formats), subscribes the input reports and feeds the same sinks as
+ * the Classic path; if the peer has no HIDS it detaches itself. Teardown on
+ * disconnect is automatic. LE scan/connect/security policy stays with the
+ * consumer (unlike Classic, where the lib owns the whole lifecycle).
+ * Returns 0, -EALREADY, -ENOMEM (no free slot), -EIO (discovery failed),
+ * or -ENOTSUP without CONFIG_BTINPUT_HOGP.
+ */
+struct bt_conn;
+int btinput_le_attach(struct bt_conn *conn);
 
 #ifdef __cplusplus
 }

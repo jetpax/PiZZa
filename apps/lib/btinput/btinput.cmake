@@ -19,7 +19,9 @@ set(BTINPUT_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 set(BTINPUT_SOURCES
   ${BTINPUT_DIR}/src/hid_host_br.c
+  ${BTINPUT_DIR}/src/hid_host_le.c
   ${BTINPUT_DIR}/src/kbd_report.c
+  ${BTINPUT_DIR}/src/mouse_report.c
 )
 
 set(BTINPUT_INCLUDE_DIRS
