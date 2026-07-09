@@ -4,7 +4,8 @@ Boots to a shell over a **USB-CDC ACM console** — plug a single
 micro-USB cable from the Pi into your laptop and the Pi shows up as
 a serial device. No external power supply, no USB-serial adapter, no
 GPIO header soldering. BCM2710 peripherals, microSD, USB UDC, and
-SDIO Wi-Fi (CYW43439) are all enabled.
+SDIO Wi-Fi (CYW43439) are all enabled. Runs on the **Raspberry Pi
+Zero 2 W** and the original **Pi Zero W**.
 
 This is the user-facing distribution side of the
 **[jetpax/zephyr](https://github.com/jetpax/zephyr) fork**, which is
@@ -15,9 +16,31 @@ will simply point at upstream tags instead of the fork.
 
 <img width="1590" height="1220" alt="image" src="https://github.com/user-attachments/assets/c639c635-40c3-427d-972d-97d92dab2b53" />
 
+## Arduino
 
+PiZZa doubles as an **Arduino board package**: write sketches in the
+Arduino IDE and Upload over the same single USB cable. The loader
+receives the sketch, stores it on the SD card and runs it natively as
+a Zephyr module (llext). No re-flash, no SD swap. Both boards are
+supported. Featured on
+[hackster.io](https://www.hackster.io/news/pizza-turns-your-raspberry-pi-sbc-into-a-powerful-arduino-306bc23d06d9).
 
+1. Flash the ready-made loader SD image from
+   [arduino-loader-v0.5.0](https://github.com/jetpax/PiZZa/releases/tag/arduino-loader-v0.5.0).
+2. In the Arduino IDE add the Boards Manager URL under **Settings →
+   Additional boards manager URLs**:
 
+   ```
+   https://raw.githubusercontent.com/jetpax/PiZZa/dev/os/Arduino/package_pizza_index.json
+   ```
+
+3. **Boards Manager** → install **PiZZA Boards** → select *PiZZa
+   (Raspberry Pi Zero 2 W)* or *(Raspberry Pi Zero W)* → **Upload**.
+
+Full walk-through, upload methods and library status:
+[apps/Arduino/README.md](apps/Arduino/README.md). The
+[`apps/`](apps/) tree also carries the native ports that exercise the
+platform: Doom, Prince of Persia (SDLPoP), and a 4-core wipEout.
 
 ## Features
 
@@ -57,8 +80,8 @@ out of scope. Legend: ✅ enabled · 🚧 planned · ❌ not planned · — N/A.
 | MIPI CSI camera | ❌ | not planned |
 | Composite video | ❌ | not planned |
 | **CPU / Kernel** | | |
-| AArch64 single-core | ✅ | Cortex-A53, core 0 only |
-| SMP (4 cores) | 🚧 | planned; upstream Zephyr BCM2710 limitation today |
+| AArch64 | ✅ | Cortex-A53; shipped shell images are single-core today |
+| SMP (4 cores) | ✅ | spin-table boot + BCM2836 mailbox IPI + FPU sharing on [`jetpax/zephyr` `dev`](https://github.com/jetpax/zephyr/tree/dev); kernel `smp` and `smp_stress` suites pass on hardware ([#1](https://github.com/jetpax/PiZZa/issues/1)); lands in the next image release |
 | CPU frequency scaling | 🚧 | runs at idle clock (~600 MHz) from USB power |
 | MMU + cache | ✅ | configured per the BCM2710 SoC tree |
 | **USB** | | |
@@ -79,7 +102,7 @@ out of scope. Legend: ✅ enabled · 🚧 planned · ❌ not planned · — N/A.
 
 | Item | Notes |
 | --- | --- |
-| Raspberry Pi Zero 2 W | Stock — no soldering, no additional hardware |
+| Raspberry Pi Zero 2 W or Zero W | Stock — no soldering, no additional hardware |
 | microSD card, ≥ 4 GB | Imaged with [PINN](https://github.com/procount/pinn) (see below) |
 | Micro-USB cable | Connects the Pi's USB-OTG port to your laptop. Carries **both power and the console**. |
 | Host computer | macOS, Linux, or Windows |
@@ -127,9 +150,10 @@ partition auto-mounts as `/Volumes/RECOVERY`; on Linux it's typically
 
 ## Install Zephyr
 
-1. **Download `zephyr.bin`** from
-   [PiZZa Releases](https://github.com/jetpax/PiZZa/releases/latest)
-   (identical artifact mirrored on
+1. **Download `zephyr.bin`** from the newest `pizza-v*` release on
+   [PiZZa Releases](https://github.com/jetpax/PiZZa/releases) (the
+   "Latest" badge tracks the Arduino package; identical artifact
+   mirrored on
    [`jetpax/zephyr` releases](https://github.com/jetpax/zephyr/releases/latest)).
    You can also build from source per the section below.
 2. **Clone or download this repo:**
