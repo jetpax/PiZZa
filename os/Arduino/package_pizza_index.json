@@ -12,15 +12,15 @@
         {
           "name": "PiZZA Boards (Pi Zero on Zephyr with Arduino)",
           "architecture": "zephyr",
-          "version": "0.5.0",
+          "version": "0.5.1",
           "category": "Contributed",
           "help": {
             "online": "https://github.com/jetpax/PiZZa#readme"
           },
-          "url": "https://github.com/jetpax/PiZZa/releases/download/arduino-core-v0.5.0/ArduinoCore-pizza-0.5.0.tar.bz2",
-          "archiveFileName": "ArduinoCore-pizza-0.5.0.tar.bz2",
-          "checksum": "SHA-256:821d931770fb4ca48c29e803f5c8807ca8e3e9aa70f0ec78810d7f2cf8702669",
-          "size": "10522823",
+          "url": "https://github.com/jetpax/PiZZa/releases/download/arduino-core-v0.5.1/ArduinoCore-pizza-0.5.1.tar.bz2",
+          "archiveFileName": "ArduinoCore-pizza-0.5.1.tar.bz2",
+          "checksum": "SHA-256:a51ac74a267fe105038039b68d1795443099e815a6f7a4321a5ea7e7e9cceadb",
+          "size": "10650560",
           "boards": [
             {
               "name": "PiZZa (Raspberry Pi Zero 2 W)"
@@ -76,10 +76,10 @@
             },
             {
               "host": "x86_64-mingw32",
-              "url": "https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v1.0.1/toolchain_gnu_windows-x86_64_aarch64-zephyr-elf.7z",
-              "archiveFileName": "toolchain_gnu_windows-x86_64_aarch64-zephyr-elf.7z",
-              "checksum": "SHA-256:17ebc57dc47bf75f8f08b429cc1c72ff5ca5c917bda1d582048cd9b399cb7579",
-              "size": "59795459"
+              "url": "https://github.com/jetpax/pizza-boards-index/releases/download/v0.3.2/toolchain_gnu_windows-x86_64_aarch64-zephyr-elf.zip",
+              "archiveFileName": "toolchain_gnu_windows-x86_64_aarch64-zephyr-elf.zip",
+              "checksum": "SHA-256:7f710eb4cfcf8d1f7aa94f47eea470308108b0790e73cfae3a70c258a06a0557",
+              "size": "125350942"
             }
           ]
         },
@@ -110,10 +110,10 @@
             },
             {
               "host": "x86_64-mingw32",
-              "url": "https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v1.0.1/toolchain_gnu_windows-x86_64_arm-zephyr-eabi.7z",
-              "archiveFileName": "toolchain_gnu_windows-x86_64_arm-zephyr-eabi.7z",
-              "checksum": "SHA-256:d08df2e83378dc8d28d0c67ab72d021ca633344b7a2bc053ababf9b8e677aa8d",
-              "size": "79217349"
+              "url": "https://github.com/jetpax/pizza-boards-index/releases/download/v0.3.2/toolchain_gnu_windows-x86_64_arm-zephyr-eabi.zip",
+              "archiveFileName": "toolchain_gnu_windows-x86_64_arm-zephyr-eabi.zip",
+              "checksum": "SHA-256:a040170ee1944fcdefb25a9e36d7a634c396aa3e0cf0cd9af6d34d673db7555d",
+              "size": "215365191"
             }
           ]
         },
