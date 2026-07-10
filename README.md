@@ -139,14 +139,18 @@ To swap the Zephyr app on an already-flashed card:
    # macOS, card auto-mounted (PiZZa images mount as /Volumes/PIZZA)
    ./install-to-sdcard.sh ~/Downloads/zephyr.bin
 
+   # original Pi Zero W (32-bit kernel, different load address)
+   ./install-to-sdcard.sh rpi_zero_w ~/Downloads/zephyr.bin
+
    # Linux
    ./install-to-sdcard.sh /media/$USER/PIZZA ~/Downloads/zephyr.bin
    ```
 
    The script copies `zephyr.bin` into the boot partition and writes
-   a new `config.txt` with safe defaults (64-bit mode, mini-UART fallback
-   console at 115200, `kernel_address=0x200000`). Your previous
-   `config.txt` is preserved as `config.txt.orig` on the first run.
+   the board's `config.txt` (defaults to the Zero 2 W; pass
+   `rpi_zero_w` for the original Zero W — the two are not
+   interchangeable). Your previous `config.txt` is preserved as
+   `config.txt.orig` on the first run.
 
 4. **Eject** the card. The installer prints the right one-liner for your
    OS:
