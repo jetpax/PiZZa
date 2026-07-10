@@ -1,7 +1,7 @@
 /*
  * apps/lib/btinput -- connection manager (CONFIG_BTINPUT_MANAGER).
  *
- * The connection policy the BtK1 harness proved on HW (rpi_zero_2w /
+ * The connection policy proven on HW during BT bring-up (rpi_zero_2w /
  * CYW43436 / 8BitDo Micro + MX Master 2S), packaged so a consumer app calls
  * btinput_manager_start() once and gets working BT HID input. Everything
  * below the policy line (security, HID channels, parsing, sinks) is owned by

@@ -66,8 +66,8 @@ config BTINPUT_MANAGER
 	bool "Connection manager (scan/page/bond policy)"
 	select BT_OBSERVER
 	help
-	  The self-contained connection policy proven on HW by the BtK1
-	  harness: settings-backed bond storage on the SD FAT, boot-time BR
+	  The self-contained connection policy proven on HW during BT
+	  bring-up: settings-backed bond storage on the SD FAT, boot-time BR
 	  inquiry for first pairing, device-initiated reconnection with the
 	  outbound rescue page (bonded Classic HID devices' own reconnect
 	  attempts are flaky), and -- with BTINPUT_HOGP -- LE scanning that

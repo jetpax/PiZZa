@@ -2,8 +2,8 @@
 #
 # apps/lib/btinput -- helper for consuming Zephyr apps.
 #
-# A minimal Classic BT (BR/EDR) HID host + boot keyboard parser, factored out
-# of apps/BtK1 so any PiZZa app can link BT input the same way it links
+# A minimal Classic BT (BR/EDR) HID host + boot keyboard parser, packaged so
+# any PiZZa app can link BT input the same way it links
 # apps/lib/sdl2shim. The consumer drives events into its own seam (SDL /
 # termdirect) via btinput_set_key_cb().
 #
@@ -24,8 +24,8 @@ set(BTINPUT_SOURCES
   ${BTINPUT_DIR}/src/mouse_report.c
 )
 
-# Opt-in pieces (Kconfig-gated so plain consumers like the BtK1 harness
-# compile nothing extra). The SDL seam additionally needs the consumer to
+# Opt-in pieces (Kconfig-gated so key-callback-only consumers compile
+# nothing extra). The SDL seam additionally needs the consumer to
 # link apps/lib/sdl2shim (it submits into that event queue).
 if(CONFIG_BTINPUT_SEAM_SDL)
   list(APPEND BTINPUT_SOURCES ${BTINPUT_DIR}/src/seam_sdl.c)

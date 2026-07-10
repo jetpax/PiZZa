@@ -3,9 +3,9 @@
 A minimal **Classic BT (BR/EDR) HID host**. Zephyr ships the BR/EDR ACL + SSP +
 L2CAP machinery but no HID host profile, so this provides it: the two HID
 L2CAP channels (PSM 0x11 control, 0x13 interrupt), boot keyboard report
-diffing, and device-initiated reconnection. It is the reusable capability
-factored out of the `apps/BtK1` bring-up harness, and links into a consumer
-exactly like `apps/lib/sdl2shim`.
+diffing, and device-initiated reconnection. It was proven on hardware by a
+dedicated bring-up harness and links into a consumer exactly like
+`apps/lib/sdl2shim`.
 
 Proven on `rpi_zero_2w` / CYW43436 / SYN43430A1 fw / 8BitDo Micro (K mode).
 See the memory `reference_zephyr_classic_hid_host` for the hard-earned rules
@@ -56,12 +56,13 @@ btinput_init();  /* servers + connectable; lib drives all BR conns from here */
 Bonded devices reconnect device-initiated with no further code. First pairing
 is consumer policy: page the device's Classic address (`bt_conn_create_br` --
 the lib takes the connection over), or `btinput_pair_mode(true)` for devices
-that pair host-ward. See `apps/BtK1` for a discovery+page flow (mice).
+that pair host-ward — or let the manager's boot inquiry handle it.
 
 `CONFIG_BTINPUT=y` selects the core Classic-BT host pieces. Board/policy
 tunables — the aarch64 BT stack sizes, `BT_MAX_CONN`/`BT_MAX_PAIRED`, legacy
 pairing (`BT_SMP_SC_PAIR_ONLY=n`), and the settings backend — stay in the
-consuming app's `prj.conf` (see `apps/BtK1/prj.conf` for the reference set).
+consuming app's board conf (see `apps/minivmac/boards/rpi_zero_2w.conf` for
+the reference set).
 
 ## The easy path: manager + SDL seam (M4.4)
 
@@ -75,7 +76,7 @@ btinput_seam_sdl_attach();   /* events -> sdl2shim queue      */
 btinput_manager_start();     /* bring-up + policy, own thread */
 ```
 
-The **manager** (`src/manager.c`) runs the BtK1-harness policy: FAT-backed
+The **manager** (`src/manager.c`) runs the hardware-proven connection policy: FAT-backed
 bond storage, `bt_enable` + patchram off the consumer's critical path, boot
 BR inquiry when nothing is bonded (pages the first discoverable HID-class
 device -- SSP Just Works), per-device rescue pages for bonded Classic devices
@@ -116,6 +117,5 @@ cd tests && cc -Wall -o /tmp/tm test_mouse_report.c ../src/mouse_report.c && /tm
 ## Roadmap (M4)
 
 M4.4 (SDL seam) and M4.5 (demo consumer: `apps/DOSBox`) are implemented.
-Remaining: the 8BitDo §4 keymap mini-pass (four provisional entries in the
+Remaining: the 8BitDo keymap mini-pass (four provisional entries in the
 DOSBox pad map), and a Classic BT mouse to exercise the BR mouse path.
-See `apps/BtK1/notes/M4_PLAN.md`.
