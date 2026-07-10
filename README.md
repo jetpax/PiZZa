@@ -7,6 +7,17 @@ GPIO header soldering. BCM2710 peripherals, microSD, USB UDC, and
 SDIO Wi-Fi (CYW43439) are all enabled. Runs on the **Raspberry Pi
 Zero 2 W** and the original **Pi Zero W**.
 
+PiZZa also has an  **Arduino board package**, so you can write sketches in the
+Arduino IDE and Upload over the same single USB cable. The loader
+receives the sketch, stores it on the SD card and runs it natively as
+a Zephyr module (llext). No re-flash, no SD swap. Both boards are
+supported. Full Arduino walk-through, upload methods and library status:
+[apps/Arduino/README.md](apps/Arduino/README.md), as featured on
+[hackster.io](https://www.hackster.io/news/pizza-turns-your-raspberry-pi-sbc-into-a-powerful-arduino-306bc23d06d9).
+
+The [`apps/`](apps/) tree also carries the native ports that exercise the
+platform: Doom, Prince of Persia (SDLPoP), MAc and Dos emulators, 4-core wipEout and the Jet 3d.
+
 This is the user-facing distribution side of the
 **[jetpax/zephyr](https://github.com/jetpax/zephyr) fork**, which is
 itself staging the upstream contribution under discussion in RFC
@@ -16,31 +27,6 @@ will simply point at upstream tags instead of the fork.
 
 <img width="1590" height="1220" alt="image" src="https://github.com/user-attachments/assets/c639c635-40c3-427d-972d-97d92dab2b53" />
 
-## Arduino
-
-PiZZa doubles as an **Arduino board package**: write sketches in the
-Arduino IDE and Upload over the same single USB cable. The loader
-receives the sketch, stores it on the SD card and runs it natively as
-a Zephyr module (llext). No re-flash, no SD swap. Both boards are
-supported. Featured on
-[hackster.io](https://www.hackster.io/news/pizza-turns-your-raspberry-pi-sbc-into-a-powerful-arduino-306bc23d06d9).
-
-1. Flash the ready-made loader SD image from
-   [arduino-loader-v0.5.0](https://github.com/jetpax/PiZZa/releases/tag/arduino-loader-v0.5.0).
-2. In the Arduino IDE add the Boards Manager URL under **Settings →
-   Additional boards manager URLs**:
-
-   ```
-   https://raw.githubusercontent.com/jetpax/PiZZa/dev/os/Arduino/package_pizza_index.json
-   ```
-
-3. **Boards Manager** → install **PiZZA Boards** → select *PiZZa
-   (Raspberry Pi Zero 2 W)* or *(Raspberry Pi Zero W)* → **Upload**.
-
-Full walk-through, upload methods and library status:
-[apps/Arduino/README.md](apps/Arduino/README.md). The
-[`apps/`](apps/) tree also carries the native ports that exercise the
-platform: Doom, Prince of Persia (SDLPoP), and a 4-core wipEout.
 
 ## Features
 
@@ -64,7 +50,7 @@ out of scope. Legend: ✅ enabled · 🚧 planned · ❌ not planned · — N/A.
 | SPI (SPI0) | ✅ | polled controller, loopback-tested |
 | I²S / PCM | ✅ | DMA-driven; cyclic mode for streaming |
 | I²C (BSC1) | ✅ | BCM2835 BSC driver, IRQ-driven; GPIO 2/3 ALT0, 100 kHz default. `i2c scan i2c@3f804000` from the shell. |
-| PWM | ✅ | BCM283x PWM block, mark:space, both channels; GPIO 12/13 (header pins 32/33). `pwm cycles pwm@3f20c000 0 19591 9795` from the shell = 490 Hz @ 50%. |
+| PWM | ✅ | BCM283x PWM block, mark:space, both channels; GPIO 12/13 (header pins 32/33). |
 | 1-Wire | ❌ | not planned |
 | **Sensors / System** | | |
 | Die-temperature sensor | ✅ | via VC firmware mailbox (`sensor get vc-thermal`) |
