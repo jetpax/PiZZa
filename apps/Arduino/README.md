@@ -86,12 +86,16 @@ back up it auto-loads the new sketch. No card swap, no manual re-flash.
 ## What works
 
 **Pi Zero 2 W:** GPIO, SPI, Wire (I²C), Serial (USB-CDC; mini-UART as `Serial1`),
-and **WiFi** (the `WiFi` library / brcmfmac).
+**WiFi** (the `WiFi` library / brcmfmac), and **PWM / `analogWrite()`** on
+**D15 = GPIO 12 (header pin 32)** and **D16 = GPIO 13 (header pin 33)** — the
+only two header pins the BCM283x PWM block reaches. `analogWrite()` on any
+other pin falls back to plain digital HIGH/LOW at half scale, so the on-board
+ACT LED (`LED_BUILTIN`) cannot fade. See the bundled `Fade` example.
 
 **Pi Zero W (original):** GPIO, Serial (USB-CDC; mini-UART as `Serial1`), and
 **WiFi** (new in 0.5.0 — same `WiFi` library / brcmfmac driver as the 2 W).
-
-- Not available on either yet: **PWM / `analogWrite`**.
+PWM is built into the Zero W loader too (same driver and D15/D16 map) but is
+not hardware-verified there yet.
 - Not supported due to hardware limitation: **`analogRead()`** (no on-chip ADC,
 but external SPI/I²C ADCs like ADS1115 or MCP3008 work).
 
