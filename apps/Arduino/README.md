@@ -1,4 +1,4 @@
-# PiZZa — Arduino on the Raspberry Pi Zero (2) W
+# Raspberry PiZZA —  Pi Zero with Zephyr and Arduino
 
 Write sketches in the **Arduino IDE** and run them on a **Raspberry Pi Zero 2 W**
 or the **original Raspberry Pi Zero W**. A small firmware on the SD card (a
