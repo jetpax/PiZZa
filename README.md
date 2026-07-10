@@ -38,7 +38,7 @@ out of scope. Legend: ✅ enabled · 🚧 planned · ❌ not planned · — N/A.
 | **Network** | | |
 | Wi-Fi station (WPA2-PSK) | ✅ | CYW43439 SDIO via brcmfmac |
 | Wi-Fi access point (softAP) | 🚧 | brcmfmac supports it; needs Zephyr wifi_mgmt glue |
-| Bluetooth (CYW43439 BT side) | 🚧 | shared silicon, separate HCI not yet exercised |
+| Bluetooth (CYW43439 BT side) | ✅ | Classic BR/EDR HID host + BLE HOGP via [`apps/lib/btinput`](apps/lib/btinput); used by [`apps/minivmac`](apps/minivmac) and [`apps/DOSBox`](apps/DOSBox). Not enabled in the default PizzaShell image. |
 | Ethernet | — | no PHY on the Pi Zero 2 W |
 | TCP/IP, DNS, DHCP client, HTTP server | ✅ | upstream Zephyr net stack |
 | **Storage** | | |
