@@ -24,6 +24,16 @@ set(BTINPUT_SOURCES
   ${BTINPUT_DIR}/src/mouse_report.c
 )
 
+# Opt-in pieces (Kconfig-gated so plain consumers like the BtK1 harness
+# compile nothing extra). The SDL seam additionally needs the consumer to
+# link apps/lib/sdl2shim (it submits into that event queue).
+if(CONFIG_BTINPUT_SEAM_SDL)
+  list(APPEND BTINPUT_SOURCES ${BTINPUT_DIR}/src/seam_sdl.c)
+endif()
+if(CONFIG_BTINPUT_MANAGER)
+  list(APPEND BTINPUT_SOURCES ${BTINPUT_DIR}/src/manager.c)
+endif()
+
 set(BTINPUT_INCLUDE_DIRS
   ${BTINPUT_DIR}
   ${BTINPUT_DIR}/src

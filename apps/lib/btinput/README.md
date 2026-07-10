@@ -63,15 +63,46 @@ tunables — the aarch64 BT stack sizes, `BT_MAX_CONN`/`BT_MAX_PAIRED`, legacy
 pairing (`BT_SMP_SC_PAIR_ONLY=n`), and the settings backend — stay in the
 consuming app's `prj.conf` (see `apps/BtK1/prj.conf` for the reference set).
 
+## The easy path: manager + SDL seam (M4.4)
+
+Games skip all of the above. With `CONFIG_BTINPUT_MANAGER=y` +
+`CONFIG_BTINPUT_SEAM_SDL=y` (and `CONFIG_BTINPUT_HOGP=y` for BLE mice) the
+whole thing is:
+
+```c
+btinput_seam_sdl_set_keymap(pad_map, ARRAY_SIZE(pad_map)); /* optional */
+btinput_seam_sdl_attach();   /* events -> sdl2shim queue      */
+btinput_manager_start();     /* bring-up + policy, own thread */
+```
+
+The **manager** (`src/manager.c`) runs the BtK1-harness policy: FAT-backed
+bond storage, `bt_enable` + patchram off the consumer's critical path, boot
+BR inquiry when nothing is bonded (pages the first discoverable HID-class
+device -- SSP Just Works), per-device rescue pages for bonded Classic devices
+(their device-initiated reconnects are flaky, HW-proven cadences), and an LE
+scan that connects bonded/HID-flavored advertisers, attaches them via
+`btinput_le_attach()`, and blocklists LE faces that never arm input (the
+8BitDo's vendor-only BLE side).
+
+The **SDL seam** (`src/seam_sdl.c`) registers the sinks and submits
+`SDL_KEYDOWN/UP` (HID usages ARE SDL scancodes; optional per-pad remap
+table), `SDL_MOUSEMOTION` (absolute + relative), `SDL_MOUSEBUTTON*` and
+`SDL_MOUSEWHEEL` through `s2s_event_submit()` -- games read them with zero
+code changes. `apps/DOSBox` is the reference consumer (M4.5).
+
 ## Layout
 
 ```
-btinput.h          public API (init, pair_mode, key + mouse sinks)
+btinput.h          public API (init, pair_mode, sinks, seam, manager)
 btinput.cmake      exports BTINPUT_SOURCES + BTINPUT_INCLUDE_DIRS  <- the seam
-Kconfig            CONFIG_BTINPUT, BTINPUT_MAX_DEVICES, log module
+Kconfig            CONFIG_BTINPUT (+HOGP, +SEAM_SDL, +MANAGER), log module
 src/hid_host_br.c  N-device Classic HID host (lifecycle, channels, demux)
+src/hid_host_le.c  LE HOGP backend (CONFIG_BTINPUT_HOGP)
 src/kbd_report.c   boot keyboard diff parser (pure C, host-testable)
 src/mouse_report.c boot mouse parser (pure C, host-testable)
+src/seam_sdl.c     events -> sdl2shim queue (CONFIG_BTINPUT_SEAM_SDL)
+src/manager.c      bring-up + connection policy (CONFIG_BTINPUT_MANAGER)
+firmware/          shared BT patchram blobs (gitignored; PROVENANCE.md)
 tests/             host unit tests for the parsers
 ```
 
@@ -84,6 +115,7 @@ cd tests && cc -Wall -o /tmp/tm test_mouse_report.c ../src/mouse_report.c && /tm
 
 ## Roadmap (M4)
 
-Remaining: the SDL seam (`seam_sdl.c`) turning usages into `SDL_KEYDOWN` /
-`SDL_MOUSEMOTION`/`BUTTON`/`WHEEL` for the sdl2shim event queue (M4.4), then a
-zero-game-code demo consumer (M4.5). See `apps/BtK1/notes/M4_PLAN.md`.
+M4.4 (SDL seam) and M4.5 (demo consumer: `apps/DOSBox`) are implemented.
+Remaining: the 8BitDo §4 keymap mini-pass (four provisional entries in the
+DOSBox pad map), and a Classic BT mouse to exercise the BR mouse path.
+See `apps/BtK1/notes/M4_PLAN.md`.

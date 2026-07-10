@@ -63,6 +63,7 @@ struct btinput_le_dev {
 	uint16_t hids_end;
 	uint16_t proto_mode_vh;
 	bool have_boot;
+	bool armed;
 	struct le_sub subs[LE_MAX_SUBS];
 	int n_subs;
 	struct bt_gatt_discover_params disc;
@@ -206,7 +207,15 @@ static void le_configure(struct btinput_le_dev *dev)
 		LOG_INF("no boot input chars -- report protocol with length "
 			"heuristic (8=kbd, 3-4=mouse; others hexdumped)");
 	}
+	dev->armed = true;
 	LOG_INF("HOGP input armed");
+}
+
+bool btinput_le_armed(struct bt_conn *conn)
+{
+	struct btinput_le_dev *dev = le_find(conn);
+
+	return dev != NULL && dev->armed;
 }
 
 /* --- discovery --------------------------------------------------------------- */
@@ -370,6 +379,12 @@ int btinput_le_attach(struct bt_conn *conn)
 {
 	ARG_UNUSED(conn);
 	return -ENOTSUP;
+}
+
+bool btinput_le_armed(struct bt_conn *conn)
+{
+	ARG_UNUSED(conn);
+	return false;
 }
 
 #endif /* CONFIG_BTINPUT_HOGP */

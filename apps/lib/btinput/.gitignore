@@ -1,0 +1,4 @@
+# Vendor BT patchram — redistributable RPi-Distro/bluez-firmware blobs, but
+# per PiZZa convention binary assets are not committed to this public repo.
+# firmware/PROVENANCE.md has the source URLs + sha256 to re-fetch locally.
+firmware/*.hcd

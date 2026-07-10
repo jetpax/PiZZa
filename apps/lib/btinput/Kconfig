@@ -51,6 +51,47 @@ config BTINPUT_HOGP
 	  hands it to btinput_le_attach(); events arrive on the same sinks as
 	  the Classic path.
 
+config BTINPUT_SEAM_SDL
+	bool "SDL seam: deliver events into the sdl2shim queue"
+	help
+	  Registers btinput's sinks as an SDL event producer: key edges become
+	  SDL_KEYDOWN/UP (HID usages ARE SDL scancodes, with an optional
+	  consumer remap table for pads with awkward stock keymaps), mouse
+	  deltas become SDL_MOUSEMOTION with both absolute and relative
+	  coordinates, plus SDL_MOUSEBUTTON*/SDL_MOUSEWHEEL -- all through
+	  s2s_event_submit(), so any sdl2shim game reads BT input with zero
+	  game-code changes. The consuming app must also link apps/lib/sdl2shim.
+
+config BTINPUT_MANAGER
+	bool "Connection manager (scan/page/bond policy)"
+	select BT_OBSERVER
+	help
+	  The self-contained connection policy proven on HW by the BtK1
+	  harness: settings-backed bond storage on the SD FAT, boot-time BR
+	  inquiry for first pairing, device-initiated reconnection with the
+	  outbound rescue page (bonded Classic HID devices' own reconnect
+	  attempts are flaky), and -- with BTINPUT_HOGP -- LE scanning that
+	  connects HID-flavored or bonded advertisers and attaches them.
+	  A consumer app calls btinput_manager_start() once; everything else
+	  is automatic. Apps needing custom policy skip this and drive
+	  btinput_init()/btinput_le_attach() themselves.
+
+	  Bond persistence note: the store is written from the manager
+	  thread and the system workqueue. ELM FatFs is NOT thread-safe by
+	  default, so any app with its own FatFs traffic (e.g. a game disk
+	  on the same card) MUST set CONFIG_FS_FATFS_REENTRANT=y (+
+	  CONFIG_FS_FATFS_LFN_MODE_STACK with LFN) or bond saves are
+	  silently lost to races (HW-observed).
+
+config BTINPUT_MANAGER_MOUNT
+	string "FAT mount point for the settings backend"
+	depends on BTINPUT_MANAGER
+	default "/SD:"
+	help
+	  Mounted (if not already) before settings init so bonds persist.
+	  CONFIG_SETTINGS_FILE_PATH must live under it. An unmountable card
+	  degrades to RAM-only bonds; input still works for the boot.
+
 module = BTINPUT
 module-str = btinput
 source "subsys/logging/Kconfig.template.log_config"
