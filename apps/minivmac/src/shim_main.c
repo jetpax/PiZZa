@@ -37,6 +37,18 @@ int main(void)
 		s2s_scripted_input_start();
 	}
 
+#ifdef CONFIG_BTINPUT
+	/* BT keyboard + mouse (apps/lib/btinput): inits the FS disk first
+	 * (mount ordering, see minivmac_btinput.c), then BT bring-up runs
+	 * on the manager's own thread while the Mac boots.
+	 */
+	{
+		extern void minivmac_btinput_start(void);
+
+		minivmac_btinput_start();
+	}
+#endif
+
 	printf("[minivmac] entering SDL_main (ProgramMain)\n");
 
 	int rc = SDL_main(argc, argv);

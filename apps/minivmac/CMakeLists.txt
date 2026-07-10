@@ -107,6 +107,30 @@ if(CONFIG_MINIVMAC_DISK_FS)
   list(APPEND MINIVMAC_SHIM_SRC src/minivmac_storage.c)
 endif()
 
+# BT HID input (keyboard + mouse) via apps/lib/btinput -- rpi_zero_2w only
+# (boards/rpi_zero_2w.conf sets CONFIG_BTINPUT; qemu has no radio).
+if(CONFIG_BTINPUT)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/../lib/btinput/btinput.cmake)
+  # The BT patchram (.hcd) is a gitignored vendor blob (PROVENANCE.md).
+  # Fail LOUDLY if missing: an empty-patchram image wedges the controller
+  # at runtime (Download_Minidriver with nothing to launch).
+  if(NOT CONFIG_AIROC_CUSTOM_FIRMWARE_HCD_BLOB)
+    message(FATAL_ERROR
+      "minivmac+BTINPUT: CONFIG_AIROC_CUSTOM_FIRMWARE_HCD_BLOB is unset")
+  endif()
+  set(_bt_blob "${CONFIG_AIROC_CUSTOM_FIRMWARE_HCD_BLOB}")
+  if(NOT IS_ABSOLUTE "${_bt_blob}")
+    set(_bt_blob "${CMAKE_CURRENT_SOURCE_DIR}/${_bt_blob}")
+  endif()
+  if(NOT EXISTS "${_bt_blob}")
+    message(FATAL_ERROR
+      "minivmac+BTINPUT: BT patchram not found:\n  ${_bt_blob}\n"
+      "It is gitignored (vendor blob) -- fetch it per "
+      "apps/lib/btinput/firmware/PROVENANCE.md before building.")
+  endif()
+  list(APPEND MINIVMAC_SHIM_SRC ${BTINPUT_SOURCES} src/minivmac_btinput.c)
+endif()
+
 # ── ROM bake (§5): raw .incbin into rodata ──────────────────────────
 if(NOT DEFINED MINIVMAC_ROM)
   set(MINIVMAC_ROM "${MINIVMAC_SRC_DIR}/extras/roms/vMac.ROM")
@@ -166,6 +190,9 @@ target_include_directories(app PRIVATE
   ${MINIVMAC_SRC_DIR}/cfg
   ${MINIVMAC_SRC_DIR}/src
 )
+if(CONFIG_BTINPUT)
+  target_include_directories(app PRIVATE ${BTINPUT_INCLUDE_DIRS})
+endif()
 
 # Mini vMac TUs are pristine upstream ANSI C; silence the pedantic warnings
 # its own build (and picolibc's stricter headers) would otherwise raise.
