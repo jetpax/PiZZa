@@ -1,0 +1,19 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * PiZZa Mini vMac overlay for qemu_cortex_a53 (sim gate).
+ *
+ * A RAM-backed FAT disk ("RAM") so the persistent-disk code path
+ * (CONFIG_MINIVMAC_DISK_FS: mount + seed + fs read/write + boot-to-Finder) is
+ * exercised in sim, standing in for the SD card the hardware uses. ~4.6 MB
+ * holds the 1.44 MB seed floppy plus FAT overhead.
+ */
+
+/ {
+	ramdisk0 {
+		compatible = "zephyr,ram-disk";
+		disk-name = "RAM";
+		sector-size = <512>;
+		sector-count = <9000>;
+	};
+};

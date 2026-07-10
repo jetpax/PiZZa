@@ -31,6 +31,15 @@ static struct k_spinlock q_lock;
 
 static Uint8 key_state[SDL_NUM_SCANCODES];
 
+/* Mouse state tracked from submitted events. Mini vMac reads the absolute
+ * position both from the motion/button events AND by polling
+ * SDL_GetMouseState every tick (its CheckMouseState), so GetMouseState must
+ * return the same tracked position or the poll would snap the cursor back.
+ */
+static int mouse_x;
+static int mouse_y;
+static Uint32 mouse_buttons;
+
 /* SDL2 default scancode -> keycode: letters/digits and a few printable
  * keys map to ASCII, everything else is scancode | SDLK_SCANCODE_MASK.
  * Matches the SDLK_* values in SDL.h that the games compare against
@@ -98,6 +107,17 @@ int s2s_event_submit(const SDL_Event *event)
 		 * having to know the keycode mapping.
 		 */
 		ev.key.keysym.sym = keycode_from_scancode(sc);
+	} else if (ev.type == SDL_MOUSEMOTION) {
+		mouse_x = ev.motion.x;
+		mouse_y = ev.motion.y;
+	} else if (ev.type == SDL_MOUSEBUTTONDOWN) {
+		mouse_x = ev.button.x;
+		mouse_y = ev.button.y;
+		mouse_buttons |= (Uint32)1u << (ev.button.button - 1);
+	} else if (ev.type == SDL_MOUSEBUTTONUP) {
+		mouse_x = ev.button.x;
+		mouse_y = ev.button.y;
+		mouse_buttons &= ~((Uint32)1u << (ev.button.button - 1));
 	}
 
 	if (q_count == S2S_EVENT_QUEUE_LEN) {
@@ -146,12 +166,12 @@ const Uint8 *SDL_GetKeyboardState(int *numkeys)
 Uint32 SDL_GetMouseState(int *x, int *y)
 {
 	if (x != NULL) {
-		*x = 0;
+		*x = mouse_x;
 	}
 	if (y != NULL) {
-		*y = 0;
+		*y = mouse_y;
 	}
-	return 0;
+	return mouse_buttons;
 }
 
 void SDL_StartTextInput(void)
@@ -171,4 +191,26 @@ int SDL_ShowCursor(int toggle)
 {
 	ARG_UNUSED(toggle);
 	return SDL_DISABLE;
+}
+
+int SDL_WaitEvent(SDL_Event *event)
+{
+	/* Block until an event is available. Mini vMac's WaitForTheNextEvent
+	 * uses this on its idle path; poll the queue with a short sleep so
+	 * producer sources (shell, scripted, future HOGP keyboard) get through.
+	 */
+	while (SDL_PollEvent(event) == 0) {
+		k_msleep(1);
+	}
+	return 1;
+}
+
+void SDL_WarpMouseInWindow(SDL_Window *window, int x, int y)
+{
+	/* No host cursor to warp; the Mac tracks its own pointer. Mini vMac
+	 * warps only to recenter under a relative-mode grab we do not use.
+	 */
+	ARG_UNUSED(window);
+	ARG_UNUSED(x);
+	ARG_UNUSED(y);
 }

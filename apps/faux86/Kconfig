@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# PiZZa Faux86 port -- app options.
+
+menu "PiZZa Faux86 port"
+
+choice FAUX86_PRESENT_BACKEND
+	prompt "Frame present backend"
+	default FAUX86_PRESENT_DISPLAY if DISPLAY
+	default FAUX86_PRESENT_SEMIHOST if QEMU_TARGET
+	default FAUX86_PRESENT_NONE
+
+config FAUX86_PRESENT_DISPLAY
+	bool "Zephyr display API (bcm2835_fb + HVS scaling on hardware)"
+	depends on DISPLAY
+
+config FAUX86_PRESENT_SEMIHOST
+	bool "Semihosting PPM frame capture (qemu sim gates)"
+
+config FAUX86_PRESENT_NONE
+	bool "Discard frames"
+
+endchoice
+
+config FAUX86_CAPTURE_EVERY
+	int "Capture every Nth frame (semihost backend)"
+	depends on FAUX86_PRESENT_SEMIHOST
+	default 30
+
+config FAUX86_SCRIPTED_INPUT
+	bool "Scripted keyboard input (sim verification)"
+	default n
+
+endmenu
+
+source "Kconfig.zephyr"

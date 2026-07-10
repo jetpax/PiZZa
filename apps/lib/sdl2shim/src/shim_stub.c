@@ -218,3 +218,89 @@ int SDL_HapticRumblePlay(SDL_Haptic *haptic, float strength, Uint32 length)
 	ARG_UNUSED(length);
 	return -1;
 }
+
+/* ── window / display / environment control stubs (Mini vMac) ─────── */
+
+void SDL_SetWindowGrab(SDL_Window *window, SDL_bool grabbed)
+{
+	ARG_UNUSED(window);
+	ARG_UNUSED(grabbed);
+}
+
+void SDL_GetWindowPosition(SDL_Window *window, int *x, int *y)
+{
+	ARG_UNUSED(window);
+	if (x != NULL) {
+		*x = 0;
+	}
+	if (y != NULL) {
+		*y = 0;
+	}
+}
+
+void SDL_RaiseWindow(SDL_Window *window)
+{
+	ARG_UNUSED(window);
+}
+
+int SDL_GetDisplayBounds(int displayIndex, SDL_Rect *rect)
+{
+	ARG_UNUSED(displayIndex);
+	if (rect == NULL) {
+		return -1;
+	}
+	/* One display the size of the Mac Plus screen; the HVS overrides any
+	 * window placement anyway.
+	 */
+	rect->x = 0;
+	rect->y = 0;
+	rect->w = 512;
+	rect->h = 342;
+	return 0;
+}
+
+/* app-dir / pref-dir: return a heap "/" (SDL contract: caller SDL_free()s
+ * it). Mini vMac prepends it to "vMac.ROM"; the fd layer matches by
+ * basename, so "/vMac.ROM" still resolves to the embedded ROM.
+ */
+static char *dup_root(void)
+{
+	char *s = malloc(2);
+
+	if (s != NULL) {
+		s[0] = '/';
+		s[1] = '\0';
+	}
+	return s;
+}
+
+char *SDL_GetBasePath(void)
+{
+	return dup_root();
+}
+
+char *SDL_GetPrefPath(const char *org, const char *app)
+{
+	ARG_UNUSED(org);
+	ARG_UNUSED(app);
+	return dup_root();
+}
+
+char *SDL_GetClipboardText(void)
+{
+	/* SDL contract: caller frees the result; hand back an empty heap
+	 * string rather than NULL.
+	 */
+	char *s = malloc(1);
+
+	if (s != NULL) {
+		s[0] = '\0';
+	}
+	return s;
+}
+
+int SDL_SetClipboardText(const char *text)
+{
+	ARG_UNUSED(text);
+	return 0;
+}

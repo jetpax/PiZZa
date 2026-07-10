@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# PiZZa DOSBox-X port -- app options.
+
+# SAMPLE_USBD_* options for sample_usbd_init.c on boards with the USB
+# device stack (rpi_zero_2w).
+source "samples/subsys/usb/common/Kconfig.sample_usbd"
+
+rsource "../lib/sdl2shim/Kconfig"
+rsource "../lib/btinput/Kconfig"
+
+menu "PiZZa DOSBox-X port"
+
+choice DOSBOX_PRESENT_BACKEND
+	prompt "Frame present backend"
+	default DOSBOX_PRESENT_DISPLAY if DISPLAY
+	default DOSBOX_PRESENT_SEMIHOST if QEMU_TARGET
+	default DOSBOX_PRESENT_NONE
+
+config DOSBOX_PRESENT_DISPLAY
+	bool "Zephyr display API (bcm2835_fb + HVS scaling on hardware)"
+	depends on DISPLAY
+
+config DOSBOX_PRESENT_SEMIHOST
+	bool "Semihosting PPM frame capture (qemu sim gates)"
+
+config DOSBOX_PRESENT_NONE
+	bool "Discard frames"
+
+endchoice
+
+config DOSBOX_CAPTURE_EVERY
+	int "Capture every Nth frame (semihost backend)"
+	depends on DOSBOX_PRESENT_SEMIHOST
+	default 200
+
+config DOSBOX_SCRIPTED_INPUT
+	bool "Scripted keyboard input at the DOS prompt (sim verification)"
+	default n
+
+endmenu
+
+source "Kconfig.zephyr"

@@ -1,0 +1,5 @@
+# Baked disk images are build inputs, not source. doom.img contains id
+# Software's DOOM.EXE (copyrighted, NOT redistributable) alongside the
+# shareware doom1.wad; it must never be committed to this public repo.
+# See assets/README.md to rebuild the images locally.
+assets/*.img

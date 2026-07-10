@@ -1,0 +1,13 @@
+# Build output (west build -d writes elsewhere; this guards an accidental
+# in-tree `west build`)
+build/
+build-*/
+
+# macOS / editor cruft
+.DS_Store
+*.swp
+
+# Vendor BT patchram — redistributable RPi-Distro/bluez-firmware blobs, but
+# per PiZZa convention binary assets are not committed to this public repo.
+# firmware/PROVENANCE.md has the source URLs + sha256 to re-fetch locally.
+firmware/*.hcd

@@ -1,0 +1,11 @@
+/* SPDX-License-Identifier: Apache-2.0
+ *
+ * DOSBox-X on qemu needs more than the board's default 128 MiB (guest
+ * RAM + VGA memory + dynrec cache + the baked DOOM image + STL). The
+ * real target (rpi_zero_2w) has 512 MiB, so this is a sim-only lift.
+ * Paired with CONFIG_QEMU_EXTRA_FLAGS="-m 256M" in the board .conf.
+ */
+
+&sram0 {
+	reg = <0x0 0x40000000 0x0 DT_SIZE_M(256)>;
+};

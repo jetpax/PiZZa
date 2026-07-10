@@ -1,0 +1,101 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# apps/lib/btinput -- Classic BT (BR/EDR) HID input host.
+#
+# CONFIG_BTINPUT is the single switch a consumer flips: it selects the Classic
+# BT host pieces the lib needs. The lib TUs register a log module against
+# CONFIG_BTINPUT_LOG_LEVEL. Board/policy tunables (aarch64 BT stack sizes,
+# BT_MAX_CONN/PAIRED, legacy pairing, the settings backend, the patchram blob
+# path) stay in the consuming app's prj.conf.
+#
+# Consuming apps pull this in with `rsource "../lib/btinput/Kconfig"`.
+
+menu "btinput (Bluetooth HID input)"
+
+config BTINPUT
+	bool "Bluetooth Classic HID input host"
+	select BT
+	select BT_CLASSIC
+	select BT_CENTRAL
+	select BT_SMP
+	select BT_BONDABLE
+	help
+	  A minimal Classic BT (BR/EDR) HID host: registers the PSM 0x11
+	  (control) + 0x13 (interrupt) L2CAP servers, accepts inbound HID
+	  links as central, and diffs boot keyboard reports into key up/down
+	  events delivered to a consumer-registered sink. Zephyr ships no HID
+	  host profile; this is it. Proven on rpi_zero_2w / CYW43436 with an
+	  8BitDo Micro.
+
+if BTINPUT
+
+config BTINPUT_MAX_DEVICES
+	int "Maximum concurrent HID devices"
+	default 3
+	range 1 7
+	help
+	  Device slots in the HID host (keyboard + mouse + spare = 3). Each
+	  slot holds two L2CAP channels and the parser state. The consuming
+	  app must budget CONFIG_BT_MAX_CONN / CONFIG_BT_MAX_PAIRED to match
+	  (those stay in prj.conf -- board/policy concerns).
+
+config BTINPUT_HOGP
+	bool "LE HOGP backend (BLE-only mice and keyboards)"
+	select BT_CENTRAL
+	select BT_GATT_CLIENT
+	select BT_GATT_AUTO_DISCOVER_CCC
+	help
+	  HID over GATT client for BLE-only devices (Logitech MX-series mice,
+	  modern BLE keyboards) -- they never appear on BR/EDR. The consumer
+	  connects + secures the LE link (scan policy is app-specific) and
+	  hands it to btinput_le_attach(); events arrive on the same sinks as
+	  the Classic path.
+
+config BTINPUT_SEAM_SDL
+	bool "SDL seam: deliver events into the sdl2shim queue"
+	help
+	  Registers btinput's sinks as an SDL event producer: key edges become
+	  SDL_KEYDOWN/UP (HID usages ARE SDL scancodes, with an optional
+	  consumer remap table for pads with awkward stock keymaps), mouse
+	  deltas become SDL_MOUSEMOTION with both absolute and relative
+	  coordinates, plus SDL_MOUSEBUTTON*/SDL_MOUSEWHEEL -- all through
+	  s2s_event_submit(), so any sdl2shim game reads BT input with zero
+	  game-code changes. The consuming app must also link apps/lib/sdl2shim.
+
+config BTINPUT_MANAGER
+	bool "Connection manager (scan/page/bond policy)"
+	select BT_OBSERVER
+	help
+	  The self-contained connection policy proven on HW by the BtK1
+	  harness: settings-backed bond storage on the SD FAT, boot-time BR
+	  inquiry for first pairing, device-initiated reconnection with the
+	  outbound rescue page (bonded Classic HID devices' own reconnect
+	  attempts are flaky), and -- with BTINPUT_HOGP -- LE scanning that
+	  connects HID-flavored or bonded advertisers and attaches them.
+	  A consumer app calls btinput_manager_start() once; everything else
+	  is automatic. Apps needing custom policy skip this and drive
+	  btinput_init()/btinput_le_attach() themselves.
+
+	  Bond persistence note: the store is written from the manager
+	  thread and the system workqueue. ELM FatFs is NOT thread-safe by
+	  default, so any app with its own FatFs traffic (e.g. a game disk
+	  on the same card) MUST set CONFIG_FS_FATFS_REENTRANT=y (+
+	  CONFIG_FS_FATFS_LFN_MODE_STACK with LFN) or bond saves are
+	  silently lost to races (HW-observed).
+
+config BTINPUT_MANAGER_MOUNT
+	string "FAT mount point for the settings backend"
+	depends on BTINPUT_MANAGER
+	default "/SD:"
+	help
+	  Mounted (if not already) before settings init so bonds persist.
+	  CONFIG_SETTINGS_FILE_PATH must live under it. An unmountable card
+	  degrades to RAM-only bonds; input still works for the boot.
+
+module = BTINPUT
+module-str = btinput
+source "subsys/logging/Kconfig.template.log_config"
+
+endif # BTINPUT
+
+endmenu
