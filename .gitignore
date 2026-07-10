@@ -1,3 +1,9 @@
 # Working notes — session-local, not part of the shipped repo
 HANDOVER*
 WORK_ORDER*
+*WORK-ORDER*
+*WORK_ORDER*
+WO-*.md
+*_PLAN.md
+*_SCOPE.md
+notes/frames/
