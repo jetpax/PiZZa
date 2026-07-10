@@ -5,9 +5,10 @@ or the **original Raspberry Pi Zero W**. A small firmware on the SD card (a
 Zephyr "loader") loads your compiled sketch as a runtime module — so after a
 one-time setup, **Upload is one button: no SD swap, no manual re-flash.**
 
-> **Boards Manager URL**
+> **Boards Manager URL** (changed at v0.6.0 — if you added the old
+> `/dev/os/Arduino/...` URL before then, replace it with this one)
 > ```
-> https://raw.githubusercontent.com/jetpax/PiZZa/dev/os/Arduino/package_pizza_index.json
+> https://raw.githubusercontent.com/jetpax/PiZZa/main/apps/Arduino/package_pizza_index.json
 > ```
 
 ## Which Pi do you have?
