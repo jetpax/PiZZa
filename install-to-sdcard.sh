@@ -1,27 +1,24 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
 #
-# install-to-sdcard.sh -- drop a Zephyr build onto a PINN-imaged
-# Raspberry Pi Zero 2 W microSD card.
-#
-# Targets a PINN recovery partition (mounted at /Volumes/RECOVERY on
-# macOS by default) rather than a vanilla Raspberry Pi OS bootfs.
+# install-to-sdcard.sh -- drop a Zephyr build onto a PiZZa-imaged
+# Raspberry Pi Zero 2 W microSD card (see make-sdcard.sh to create one).
 #
 # Usage:
-#   install-to-sdcard.sh [<recovery-mount-point>] <path-to-zephyr.bin>
+#   install-to-sdcard.sh [<boot-partition-mount>] <path-to-zephyr.bin>
 #
 # Examples:
-#   # macOS, PINN-imaged card auto-mounts at /Volumes/RECOVERY:
+#   # macOS, PiZZa card auto-mounts at /Volumes/PIZZA:
 #   ./install-to-sdcard.sh ~/Downloads/zephyr.bin
 #
 #   # Explicit mount point:
-#   ./install-to-sdcard.sh /Volumes/RECOVERY ~/Downloads/zephyr.bin
+#   ./install-to-sdcard.sh /Volumes/PIZZA ~/Downloads/zephyr.bin
 #
 #   # Linux:
-#   ./install-to-sdcard.sh /media/$USER/RECOVERY ~/Downloads/zephyr.bin
+#   ./install-to-sdcard.sh /media/$USER/PIZZA ~/Downloads/zephyr.bin
 #
 # The script:
-#   1. Copies zephyr.bin into the recovery partition.
+#   1. Copies zephyr.bin into the boot partition.
 #   2. Replaces config.txt with the rpi_zero_2w boot params
 #      (mini-UART fallback console @ 115200, 64-bit kernel at
 #      0x200000), preserving the original as config.txt.orig on
@@ -32,8 +29,11 @@
 
 set -e
 
-# Default mount point if only one arg given. Override by passing two.
-DEFAULT_MOUNT="/Volumes/RECOVERY"
+# Default mount point if only one arg given (first existing candidate
+# wins -- PIZZA is the make-sdcard.sh volume label, RECOVERY covers
+# cards imaged before July 2026). Override by passing two args.
+DEFAULT_MOUNT="/Volumes/PIZZA"
+[ -d "$DEFAULT_MOUNT" ] || { [ -d /Volumes/RECOVERY ] && DEFAULT_MOUNT="/Volumes/RECOVERY"; } || true
 
 case $# in
 1)
@@ -48,8 +48,8 @@ case $# in
 	cat >&2 <<EOF
 Usage: $0 [<recovery-mount-point>] <path-to-zephyr.bin>
 
-If <recovery-mount-point> is omitted it defaults to $DEFAULT_MOUNT
-(the macOS auto-mount path for a PINN-imaged Pi SD card).
+If <boot-partition-mount> is omitted it defaults to $DEFAULT_MOUNT
+(the macOS auto-mount path for a PiZZa-imaged SD card).
 EOF
 	exit 1
 	;;
@@ -66,7 +66,7 @@ fi
 if [ ! -f "$MOUNT/bootcode.bin" ] || [ ! -f "$MOUNT/start.elf" ]; then
 	echo "error: $MOUNT does not look like a Pi boot partition" >&2
 	echo "       (no bootcode.bin or start.elf present)" >&2
-	echo "       Make sure the SD card is PINN-imaged." >&2
+	echo "       Flash a PiZZa image first -- see make-sdcard.sh / Releases." >&2
 	exit 1
 fi
 

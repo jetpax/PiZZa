@@ -10,9 +10,8 @@
 # (game assets, disk images). Flash the result with Raspberry Pi
 # Imager (Use custom) or balenaEtcher.
 #
-# This replaces the PINN-based install path (stage-os.sh) as the
-# canonical way to create a card; install-to-sdcard.sh remains the
-# quick way to swap zephyr.bin on an existing card.
+# This is the canonical way to create a card; install-to-sdcard.sh
+# remains the quick way to swap zephyr.bin on an existing card.
 #
 # Loop-free (uses mtools), so it runs in a plain Docker container --
 # no root, no privileged mode, works the same on macOS and Linux.

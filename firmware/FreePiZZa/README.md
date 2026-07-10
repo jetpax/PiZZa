@@ -16,8 +16,8 @@ Zephyr SDK. Free PiZZa is **VPU-side scalar firmware** built with
 `vc4-elf-gcc` (itszor/vc4-toolchain — unrelated to `vc4asm`, the QPU
 shader assembler used by apps/wipeout). Its artifact is a
 `bootcode.bin` that is card-global: it replaces the boot chain for
-every OS on the card, so Free PiZZa cards are dedicated single-image
-cards, not PINN menu entries.
+the whole card, so Free PiZZa cards are dedicated single-image
+cards.
 
 ## Layout
 

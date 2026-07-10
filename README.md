@@ -44,7 +44,7 @@ out of scope. Legend: ✅ enabled · 🚧 planned · ❌ not planned · — N/A.
 | **Storage** | | |
 | microSD card | ✅ | external slot via BCM283x SDHost |
 | FAT / LittleFS mount | ✅ | upstream Zephyr FS stack |
-| ext4 (for reading PINN-installed OS partitions) | ❌ | not in scope |
+| ext4 | ❌ | not in scope |
 | **Buses & GPIO** | | |
 | GPIO + interrupts | ✅ | BCM2711 family driver + bcm2835 pull control |
 | SPI (SPI0) | ✅ | polled controller, loopback-tested |
@@ -120,16 +120,9 @@ root (Docker, loop-free, works the same on macOS and Linux):
 ./make-sdcard.sh rpi_zero_2w build/doom/zephyr/zephyr.bin -o pizza-doom.img doom.img
 ```
 
-> PiZZa originally installed via PINN's multi-boot recovery partition;
-> that path was retired in July 2026 in favour of plain flashable
-> images (same mechanism as the Arduino loader images). Existing PINN
-> cards keep working — `install-to-sdcard.sh` doesn't care how the FAT
-> partition got there.
-
 ## Update an existing card
 
-To swap the Zephyr app on an already-flashed card (any card with a FAT
-boot partition — PiZZa image or legacy PINN):
+To swap the Zephyr app on an already-flashed card:
 
 1. **Download `zephyr.bin`** from the newest release, or build from
    source per the section below.
@@ -305,11 +298,9 @@ GPIO 15 (RXD) / GND**, not the PL011/Bluetooth-shared pins
 
 **Installer says the card doesn't look like a Pi boot partition.**
 The boot partition needs `bootcode.bin`, `start.elf`, and
-`fixup.dat` already present — a PiZZa image (or a legacy PINN card)
-has them. If the card was imaged with plain Raspberry Pi OS instead,
-the mount point is `/Volumes/bootfs` — use the upstream zephyr port's
-`install-to-sdcard.sh` for that layout, or just re-flash a PiZZa
-image.
+`fixup.dat` already present — a PiZZa image has them. If the card was
+imaged with plain Raspberry Pi OS instead, the mount point is
+`/Volumes/bootfs` — just re-flash a PiZZa image.
 
 **Wi-Fi connect fails.** Check `wifi scan` returns your SSID; check
 `wifi status` for the actual disconnect reason. Open
@@ -368,4 +359,3 @@ log channel for performance work; otherwise stick with USB-CDC.
 - [`jetpax/zephyr`](https://github.com/jetpax/zephyr) — the Zephyr fork staging the upstream contribution
 - [`jetpax/hal_broadcom`](https://github.com/jetpax/hal_broadcom) — Zephyr module for the brcmfmac firmware blobs
 - [`zephyrproject-rtos/zephyr`](https://github.com/zephyrproject-rtos/zephyr) — Zephyr upstream
-- [PINN](https://github.com/procount/pinn) — the multi-boot installer PiZZa used before July 2026 (legacy cards still work)

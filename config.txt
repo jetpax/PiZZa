@@ -1,5 +1,5 @@
 # config.txt template for booting Zephyr on a Raspberry Pi Zero 2 W
-# from a PINN-imaged microSD card.
+# from the SD card's FAT boot partition (see make-sdcard.sh).
 #
 # install-to-sdcard.sh writes this content automatically; the file
 # is committed here so reviewers can see the boot config without

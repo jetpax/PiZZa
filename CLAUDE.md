@@ -19,9 +19,6 @@ private and must never be committed or pushed. The gitignore covers
   endpoint directory were retired at v0.6.0; the URL break was accepted.)
 - `apps/<Name>` are Zephyr applications; `apps/lib/` holds shared libs
   (sdl2shim, btinput) consumed via CMake `include()`.
-- The card-side PINN layout is still `os/<NAME>` — `stage-os.sh` maps repo
-  `apps/<NAME>` to card `os/<NAME>`. Do not "fix" the `os/` strings in
-  `stage-os.sh`.
 - `apps/Arduino/package_pizza_index.json` is the published Boards-Manager
   endpoint (single canonical copy, hand-updated each core release):
   `raw.githubusercontent.com/jetpax/PiZZa/main/apps/Arduino/package_pizza_index.json`
