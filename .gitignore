@@ -13,3 +13,6 @@ notes/frames/
 /.sdcard-work/
 /*.img
 /*.img.xz
+
+# local session notes for AI tooling -- never committed
+CLAUDE.local.md
