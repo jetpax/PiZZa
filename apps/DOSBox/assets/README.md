@@ -15,11 +15,13 @@ registered v1.9 build) has DOS/4GW bound in, so no separate extender is
 needed. `doom1.wad` is the freely redistributable shareware IWAD.
 
 `DEFAULT.CFG` preselects Sound Blaster SFX + SB FM (OPL) music at the
-standard A220/I7/D1 so vanilla DOOM makes sound without running SETUP;
-`SETUP.EXE` is included for interactive reconfiguration.
+standard A220/I7/D1 so vanilla DOOM makes sound without running SETUP,
+and enables the DOS mouse driver (`use_mouse 1`) so a BT mouse
+(CONFIG_BTINPUT / apps/lib/btinput) works in-game; `SETUP.EXE` is
+included for interactive reconfiguration.
 
 ```sh
-printf 'snd_channels 3\r\nsnd_musicdevice 3\r\nsnd_sfxdevice 3\r\nsnd_sbport 544\r\nsnd_sbirq 7\r\nsnd_sbdma 1\r\nsnd_mport 816\r\n' > default.cfg
+printf 'snd_channels 3\r\nsnd_musicdevice 3\r\nsnd_sfxdevice 3\r\nsnd_sbport 544\r\nsnd_sbirq 7\r\nsnd_sbdma 1\r\nsnd_mport 816\r\nuse_mouse 1\r\nmouse_sensitivity 5\r\nmouseb_fire 0\r\nmouseb_strafe 1\r\nmouseb_forward 2\r\n' > default.cfg
 dd if=/dev/zero of=doom.img bs=1024 count=6552
 mformat -i doom.img -h 16 -s 63 -t 13 ::
 mcopy -i doom.img /path/to/DOOM.EXE  ::DOOM.EXE

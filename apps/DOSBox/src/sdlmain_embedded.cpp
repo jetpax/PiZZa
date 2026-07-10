@@ -42,6 +42,9 @@ extern "C" void dbx_bump_arm_clock(void);
 extern "C" void dbx_scripted_at_prompt(void);
 extern "C" void dbx_scripted_pump(void);
 #endif
+#ifdef CONFIG_BTINPUT
+extern "C" void dbx_btinput_start(void);
+#endif
 
 /* ── the sdl global every output/gui TU pokes ───────────────────── */
 SDL_Block sdl;
@@ -195,15 +198,53 @@ void GFX_Events(void)
 		switch (event.type) {
 		case SDL_KEYDOWN:
 		case SDL_KEYUP:
-		case SDL_MOUSEBUTTONDOWN:
-		case SDL_MOUSEBUTTONUP:
 		case SDL_JOYAXISMOTION:
 		case SDL_JOYBUTTONDOWN:
 		case SDL_JOYBUTTONUP:
 			MAPPER_CheckEvent(&event);
 			break;
-		case SDL_MOUSEMOTION:
-			/* wired in P2c alongside mouse capture */
+		/* Mouse -> the INT 33h core directly (upstream HandleMouse*
+		 * minus host-cursor capture, which does not exist here).
+		 * emulate=true: no host cursor to track, integrate relative
+		 * motion like upstream's captured mode. Absolute x/y still
+		 * ride along, normalized to the window, for the driver's
+		 * non-emulated position.
+		 */
+		case SDL_MOUSEMOTION: {
+			int w = 640, h = 400;
+
+			if (sdl.window != NULL) {
+				SDL_GetWindowSize(sdl.window, &w, &h);
+			}
+			Mouse_CursorMoved((float)event.motion.xrel,
+					  (float)event.motion.yrel,
+					  (float)event.motion.x / (float)(w - 1),
+					  (float)event.motion.y / (float)(h - 1),
+					  true);
+			break;
+		}
+		case SDL_MOUSEBUTTONDOWN:
+		case SDL_MOUSEBUTTONUP: {
+			uint8_t b;
+
+			switch (event.button.button) {
+			case SDL_BUTTON_LEFT:   b = 0; break;
+			case SDL_BUTTON_RIGHT:  b = 1; break;
+			case SDL_BUTTON_MIDDLE: b = 2; break;
+			default: b = 0xff; break;
+			}
+			if (b != 0xff) {
+				if (event.type == SDL_MOUSEBUTTONDOWN) {
+					Mouse_ButtonPressed(b);
+				} else {
+					Mouse_ButtonReleased(b);
+				}
+			}
+			break;
+		}
+		case SDL_MOUSEWHEEL:
+			/* upstream HandleMouseWheel "normal" sign */
+			Mouse_WheelMoved(-event.wheel.y);
 			break;
 		default:
 			break;
@@ -557,6 +598,14 @@ int main(void)
 	dbx_bump_arm_clock();
 
 	SDL_Init(SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_VIDEO);
+
+#ifdef CONFIG_BTINPUT
+	/* BT HID input: bring-up (patchram download + reconnect policy) runs
+	 * on the manager's own thread while DOSBox boots; events land in the
+	 * sdl2shim queue GFX_Events drains.
+	 */
+	dbx_btinput_start();
+#endif
 
 	/* sdl is a default-constructed global (NSDMIs zero it); do NOT
 	 * memset — SDL_Block owns C++ members.

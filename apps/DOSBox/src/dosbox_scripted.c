@@ -25,12 +25,21 @@
  * replays demo1 as fast as possible then prints the timing to the DOS
  * console and exits -- a strong dynrec correctness check (any codegen
  * bug desyncs the demo).
+ *
+ * With BT input in the image (CONFIG_BTINPUT) the build exists to be
+ * PLAYED: launch DOOM interactive instead. The pad's remapped keys
+ * cannot type at the DOS prompt, so the script still does the mount +
+ * launch; the human takes over at the title screen.
  */
 static const char script[] =
 	"imgmount c /doom.img -t hdd -fs fat\n"
 	"c:\n"
 	"dir\n"
+#ifdef CONFIG_BTINPUT
+	"doom\n";
+#else
 	"doom -timedemo demo1\n";
+#endif
 
 static bool armed;
 static Uint32 t_armed;

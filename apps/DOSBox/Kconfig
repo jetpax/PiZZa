@@ -7,6 +7,7 @@
 source "samples/subsys/usb/common/Kconfig.sample_usbd"
 
 rsource "../lib/sdl2shim/Kconfig"
+rsource "../lib/btinput/Kconfig"
 
 menu "PiZZa DOSBox-X port"
 
