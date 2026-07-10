@@ -89,7 +89,7 @@ out of scope. Legend: ✅ enabled · 🚧 planned · ❌ not planned · — N/A.
 | Item | Notes |
 | --- | --- |
 | Raspberry Pi Zero 2 W or Zero W | Stock — no soldering, no additional hardware |
-| microSD card, ≥ 4 GB | Imaged with [PINN](https://github.com/procount/pinn) (see below) |
+| microSD card, ≥ 4 GB | Flashed with a PiZZa image (see below) |
 | Micro-USB cable | Connects the Pi's USB-OTG port to your laptop. Carries **both power and the console**. |
 | Host computer | macOS, Linux, or Windows |
 
@@ -101,47 +101,38 @@ A USB-to-serial adapter (FTDI / CP210x / etc.) is **optional** — only
 needed if you want to use the GPIO-header UART as a fallback console.
 See [Console options](#console-options) at the bottom.
 
-## Image the SD card with PINN
+## Flash the SD card
 
-Use the official cross-platform
-[Raspberry Pi Imager](https://www.raspberrypi.com/software/) (v2.0 or
-later — available for macOS, Linux, and Windows). PINN is one of the
-images it knows about:
+Grab a `pizza-*.img.xz` from
+[PiZZa Releases](https://github.com/jetpax/PiZZa/releases) and flash it
+with [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
+(**Use custom**) or balenaEtcher. That's the whole install: the image is
+a single FAT32 boot partition carrying the pinned Raspberry Pi boot
+blobs, `config.txt`, and the Zephyr app.
 
-1. Launch Pi Imager.
-2. Choose your microSD card under **Storage**.
-3. Under **OS** scroll to and click **Misc utility images**.
+To image a card from a local build instead, use the builder at the repo
+root (Docker, loop-free, works the same on macOS and Linux):
 
-<img width="1584" height="1188" alt="image" src="https://github.com/user-attachments/assets/40a27b4f-a48c-42b5-9f1f-097fe0e21bcc" />
+```sh
+./make-sdcard.sh rpi_zero_2w path/to/zephyr.bin
+./make-sdcard.sh rpi_zero_w  path/to/zephyr.bin
+# extra payload files (game assets, disk images) are copied onto the FAT:
+./make-sdcard.sh rpi_zero_2w build/doom/zephyr/zephyr.bin -o pizza-doom.img doom.img
+```
 
+> PiZZa originally installed via PINN's multi-boot recovery partition;
+> that path was retired in July 2026 in favour of plain flashable
+> images (same mechanism as the Arduino loader images). Existing PINN
+> cards keep working — `install-to-sdcard.sh` doesn't care how the FAT
+> partition got there.
 
-4. Pick **PINN — A multi-boot OS installer with OS admin features**.
+## Update an existing card
 
+To swap the Zephyr app on an already-flashed card (any card with a FAT
+boot partition — PiZZa image or legacy PINN):
 
-<img width="1584" height="1188" alt="image" src="https://github.com/user-attachments/assets/7de96605-a242-423f-94b4-7825f6de18f3" />
-
-5. Click **Next** → write. Eject when done.
-
-PINN sets up the recovery partition (`bootcode.bin`, `start.elf`,
-`fixup.dat`, `config.txt`) that Zephyr boots from. On macOS the
-partition auto-mounts as `/Volumes/RECOVERY`; on Linux it's typically
-`/media/$USER/RECOVERY`.
-
-> **Why PINN?** Today the Zephyr image boots straight from the PINN
-> recovery partition and doesn't strictly need a partition manager —
-> a vanilla FAT SD card would work. PINN is in place so that future
-> updates can land as a separate filesystem partition rather than a
-> full kernel reflash. Starting on PINN means no re-imaging when that
-> capability arrives.
-
-## Install Zephyr
-
-1. **Download `zephyr.bin`** from the newest `pizza-v*` release on
-   [PiZZa Releases](https://github.com/jetpax/PiZZa/releases) (the
-   "Latest" badge tracks the Arduino package; identical artifact
-   mirrored on
-   [`jetpax/zephyr` releases](https://github.com/jetpax/zephyr/releases/latest)).
-   You can also build from source per the section below.
+1. **Download `zephyr.bin`** from the newest release, or build from
+   source per the section below.
 2. **Clone or download this repo:**
 
    ```sh
@@ -152,14 +143,14 @@ partition auto-mounts as `/Volumes/RECOVERY`; on Linux it's typically
 3. **Run the installer:**
 
    ```sh
-   # macOS, PINN card auto-mounted at /Volumes/RECOVERY
+   # macOS, card auto-mounted (PiZZa images mount as /Volumes/PIZZA)
    ./install-to-sdcard.sh ~/Downloads/zephyr.bin
 
    # Linux
-   ./install-to-sdcard.sh /media/$USER/RECOVERY ~/Downloads/zephyr.bin
+   ./install-to-sdcard.sh /media/$USER/PIZZA ~/Downloads/zephyr.bin
    ```
 
-   The script copies `zephyr.bin` into the recovery partition and writes
+   The script copies `zephyr.bin` into the boot partition and writes
    a new `config.txt` with safe defaults (64-bit mode, mini-UART fallback
    console at 115200, `kernel_address=0x200000`). Your previous
    `config.txt` is preserved as `config.txt.orig` on the first run.
@@ -169,7 +160,7 @@ partition auto-mounts as `/Volumes/RECOVERY`; on Linux it's typically
 
    ```sh
    # macOS
-   diskutil eject /Volumes/RECOVERY
+   diskutil eject /Volumes/PIZZA
    ```
 
 5. **Insert** into the Pi and plug a micro-USB cable from the Pi's USB
@@ -296,10 +287,9 @@ compile the brcmfmac firmware into `zephyr.bin` via `hal_broadcom`
 `zephyr.bin` slim down by ~500 KB and read
 `brcmfmac43436s-sdio.{bin,txt}` from the SD filesystem instead — but
 that code is not yet in `zp16-wifi-brcmfmac`. Note: the firmware
-files are not on the PINN recovery partition itself; they ship
-inside the per-OS images PINN can install (Raspberry Pi OS Lite,
-etc.) on a separate ext4 root partition, which Zephyr cannot
-currently read.
+files are not on the boot FAT of a stock Raspberry Pi OS card either;
+they live on its ext4 root partition, which Zephyr cannot currently
+read.
 
 ## Troubleshooting
 
@@ -313,12 +303,13 @@ appear, fall back to the GPIO mini-UART at 115200 (see
 GPIO 15 (RXD) / GND**, not the PL011/Bluetooth-shared pins
 (`dtoverlay=disable-bt` is **not** set in the default config.txt).
 
-**Installer says `RECOVERY` doesn't look like a Pi boot partition.**
-The recovery partition needs `bootcode.bin`, `start.elf`, and
-`fixup.dat` already present — those come from PINN. If the card was
-imaged with plain Raspberry Pi OS instead, the mount point is
-`/Volumes/bootfs`, not `/Volumes/RECOVERY` — use the upstream zephyr
-port's `install-to-sdcard.sh` for that layout.
+**Installer says the card doesn't look like a Pi boot partition.**
+The boot partition needs `bootcode.bin`, `start.elf`, and
+`fixup.dat` already present — a PiZZa image (or a legacy PINN card)
+has them. If the card was imaged with plain Raspberry Pi OS instead,
+the mount point is `/Volumes/bootfs` — use the upstream zephyr port's
+`install-to-sdcard.sh` for that layout, or just re-flash a PiZZa
+image.
 
 **Wi-Fi connect fails.** Check `wifi scan` returns your SSID; check
 `wifi status` for the actual disconnect reason. Open
@@ -377,4 +368,4 @@ log channel for performance work; otherwise stick with USB-CDC.
 - [`jetpax/zephyr`](https://github.com/jetpax/zephyr) — the Zephyr fork staging the upstream contribution
 - [`jetpax/hal_broadcom`](https://github.com/jetpax/hal_broadcom) — Zephyr module for the brcmfmac firmware blobs
 - [`zephyrproject-rtos/zephyr`](https://github.com/zephyrproject-rtos/zephyr) — Zephyr upstream
-- [PINN](https://github.com/procount/pinn) — the bootloader/installer used on the SD card
+- [PINN](https://github.com/procount/pinn) — the multi-boot installer PiZZa used before July 2026 (legacy cards still work)

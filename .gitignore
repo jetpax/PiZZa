@@ -7,3 +7,9 @@ WO-*.md
 *_PLAN.md
 *_SCOPE.md
 notes/frames/
+
+# make-sdcard.sh outputs + caches
+/blobs/
+/.sdcard-work/
+/*.img
+/*.img.xz
