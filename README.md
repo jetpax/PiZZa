@@ -41,7 +41,7 @@ out of scope. Legend: ✅ enabled · 🚧 planned · ❌ not planned · — N/A.
 | SPI (SPI0) | ✅ | polled controller, loopback-tested |
 | I²S / PCM | ✅ | DMA-driven; cyclic mode for streaming |
 | I²C (BSC1) | ✅ | BCM2835 BSC driver, IRQ-driven; GPIO 2/3 ALT0, 100 kHz default. `i2c scan i2c@3f804000` from the shell. |
-| PWM | 🚧 | planned |
+| PWM | ✅ | BCM283x PWM block, mark:space, both channels; GPIO 12/13 (header pins 32/33). `pwm cycles pwm@3f20c000 0 19591 9795` from the shell = 490 Hz @ 50%. |
 | 1-Wire | ❌ | not planned |
 | **Sensors / System** | | |
 | Die-temperature sensor | ✅ | via VC firmware mailbox (`sensor get vc-thermal`) |
@@ -242,6 +242,7 @@ the corresponding GitHub Release. It bundles:
 | microSD (external slot) | BCM283x legacy SDHost | [zp13](https://github.com/jetpax/zephyr/tree/zp13-sdhc-bcm2835-sdhost) |
 | SDIO (on-chip Wi-Fi bus) | Arasan SDHCI | [zp14](https://github.com/jetpax/zephyr/tree/zp14-sdhc-bcm2835-sdhci) |
 | Wi-Fi | brcmfmac, native L2, WPA2-PSK | [zp16](https://github.com/jetpax/zephyr/tree/zp16-wifi-brcmfmac) |
+| PWM | BCM283x PWM block (mark:space) + CM_PWM clock | [pizero](https://github.com/jetpax/zephyr/tree/pizero) (zp staging branch pending) |
 | Wi-Fi firmware blobs | **Bundled into `zephyr.bin`** at build time (via `hal_broadcom` + `west blobs fetch` from `rpi-distro/firmware-nonfree`). | [hal_broadcom](https://github.com/jetpax/hal_broadcom) |
 
 ## Rebuilding from source
