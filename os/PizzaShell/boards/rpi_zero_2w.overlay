@@ -101,3 +101,15 @@
 	status = "okay";
 	current-speed = <115200>;
 };
+
+/*
+ * PWM channels 0 / 1 on header pins 32 / 33 (GPIO 12 / 13, ALT0).
+ * Bring-up: `pwm cycles <dev> <chan> <period> <pulse>` from the shell
+ * -- e.g. `pwm cycles pwm@X 0 24489 12245` is ~392 Hz at 50% duty on
+ * GPIO 12 with the default 9.6 MHz reference clock.
+ */
+&pwm0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm_gpio12>;
+	status = "okay";
+};
