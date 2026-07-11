@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.2" tiledversion="1.2.4" orientation="orthogonal" renderorder="right-down" width="20" height="11" tilewidth="36" tileheight="36" infinite="0" backgroundcolor="#262626" nextlayerid="3" nextobjectid="27">
+ <tileset firstgid="1" name="sokoban_tiles" tilewidth="36" tileheight="36" tilecount="6" columns="6">
+  <image source="../../sokoban_tiles.png" trans="ffffff" width="216" height="36"/>
+ </tileset>
+ <layer id="1" name="Tile Layer 1" width="20" height="11">
+  <data encoding="base64" compression="zlib">
+   eJxjYEAFjFgwJQCknwkJDxbzkP2Hbh45ZqKbQ64b0d2FTCOzcenBhtHdgs08fHrQwwaXP0nF+NxLTDgQE86E/EIIYzOPWLXYAAAR8wC/
+  </data>
+ </layer>
+ <objectgroup id="2" name="Object Layer 1">
+  <object id="11" name="Box" gid="4" x="72" y="288" width="36" height="36"/>
+  <object id="12" name="Man" gid="3" x="396" y="324" width="36" height="36"/>
+  <object id="14" name="Goal" gid="5" x="612" y="324" width="36" height="36"/>
+  <object id="16" name="Box" gid="4" x="180" y="288" width="36" height="36"/>
+  <object id="17" name="Goal" gid="5" x="612" y="288" width="36" height="36"/>
+  <object id="18" name="Goal" gid="5" x="612" y="252" width="36" height="36"/>
+  <object id="19" name="Goal" gid="5" x="648" y="252" width="36" height="36"/>
+  <object id="20" name="Goal" gid="5" x="648" y="288" width="36" height="36"/>
+  <object id="21" name="Goal" gid="5" x="648" y="324" width="36" height="36"/>
+  <object id="22" name="Box" gid="4" x="180" y="180" width="36" height="36"/>
+  <object id="23" name="Box" gid="4" x="180" y="108" width="36" height="36"/>
+  <object id="24" name="Box" gid="4" x="252" y="144" width="36" height="36"/>
+  <object id="26" name="Box" gid="4" x="252" y="180" width="36" height="36"/>
+ </objectgroup>
+</map>

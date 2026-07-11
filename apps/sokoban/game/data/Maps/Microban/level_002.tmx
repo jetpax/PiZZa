@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" renderorder="right-down" width="6" height="7" tilewidth="36" tileheight="36" backgroundcolor="#800000" nextobjectid="22">
+ <tileset firstgid="1" name="sokoban_tiles" tilewidth="36" tileheight="36" tilecount="6">
+  <image source="../../sokoban_tiles.png" trans="ffffff" width="216" height="36"/>
+ </tileset>
+ <layer name="Tile Layer 1" width="6" height="7">
+  <data encoding="base64" compression="zlib">
+   eJxjZGBgYMSBmdAwsjgjDnFc6kkRx4YBFQwAPg==
+  </data>
+ </layer>
+ <objectgroup name="Object Layer 1">
+  <object id="11" name="Box" gid="4" x="72" y="144" width="36" height="36"/>
+  <object id="12" name="Man" gid="3" x="108" y="108" width="36" height="36"/>
+  <object id="14" name="Goal" gid="5" x="72" y="180" width="36" height="36"/>
+  <object id="20" name="BoxOnGoal" gid="6" x="108" y="180" width="36" height="36"/>
+  <object id="21" name="BoxOnGoal" gid="6" x="108" y="144" width="36" height="36"/>
+ </objectgroup>
+</map>

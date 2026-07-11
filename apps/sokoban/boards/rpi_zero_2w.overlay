@@ -1,0 +1,61 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * PiZZa sokoban overlay for rpi_zero_2w.
+ *
+ *   - &mbox0 + &firmware: VC mailbox + property tags (FB alloc).
+ *   - &vc_fb: HDMI framebuffer at the monitor's EDID-negotiated
+ *     scanout mode; the renderer paints its native 640x480 frame into
+ *     the virtual FB and the VideoCore HVS scales it to the cable on
+ *     the fly -- the proven Jet / wipeout / Doom / SDLPoP trick.
+ *     640 * 4 = 2560 bytes/row = 64-byte aligned, so the FB driver's
+ *     contiguous-DMA fast path engages.
+ *   - &dma: BCM2835 DMA for the backbuffer->fb blit.
+ *   - &usb + cdc_acm child: USB CDC ACM shell endpoint.
+ *   - mini-UART (uart1) console + LOG target, PiZZa convention.
+ */
+
+#include <zephyr/dt-bindings/display/panel.h>
+
+&mbox0 {
+	status = "okay";
+};
+
+&firmware {
+	status = "okay";
+};
+
+&dma {
+	status = "okay";
+};
+
+&vc_fb {
+	pixel-format = <PANEL_PIXEL_FORMAT_ARGB_8888>;
+	render-width = <640>;
+	render-height = <480>;
+	status = "okay";
+};
+
+&usb {
+	status = "okay";
+
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+		label = "PiZZa sokoban shell (USB CDC ACM)";
+	};
+};
+
+/ {
+	chosen {
+		zephyr,console = &uart1;
+		zephyr,shell-uart = &cdc_acm_uart0;
+		zephyr,display = &vc_fb;
+	};
+};
+
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_gpio14>;
+	status = "okay";
+	current-speed = <115200>;
+};

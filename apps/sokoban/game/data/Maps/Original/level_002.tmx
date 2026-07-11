@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" renderorder="right-down" width="14" height="10" tilewidth="36" tileheight="36" backgroundcolor="#262626" nextobjectid="41">
+ <tileset firstgid="1" name="sokoban_tiles" tilewidth="36" tileheight="36" tilecount="6">
+  <image source="../../sokoban_tiles.png" trans="ffffff" width="216" height="36"/>
+ </tileset>
+ <layer name="Tile Layer 1" width="14" height="10">
+  <data encoding="base64" compression="zlib">
+   eJxjZGBgYCQBwwCIzYSGsYkxYTGDWH3o+nHpw2U+Ln2EzCfGPkJ+xOYmfObiC1d87iY3PpD1kYIB5BgAyw==
+  </data>
+ </layer>
+ <objectgroup name="Object Layer 1">
+  <object id="11" name="Box" gid="4" x="252" y="288" width="36" height="36"/>
+  <object id="12" name="Man" gid="3" x="252" y="180" width="36" height="36"/>
+  <object id="16" name="Box" gid="4" x="324" y="288" width="36" height="36"/>
+  <object id="22" name="Box" gid="4" x="360" y="216" width="36" height="36"/>
+  <object id="23" name="Box" gid="4" x="252" y="108" width="36" height="36"/>
+  <object id="24" name="Box" gid="4" x="216" y="144" width="36" height="36"/>
+  <object id="26" name="Box" gid="4" x="360" y="108" width="36" height="36"/>
+  <object id="27" name="Box" gid="4" x="396" y="288" width="36" height="36"/>
+  <object id="28" name="Box" gid="4" x="324" y="252" width="36" height="36"/>
+  <object id="29" name="Box" gid="4" x="396" y="252" width="36" height="36"/>
+  <object id="30" gid="5" x="36" y="72" width="36" height="36"/>
+  <object id="31" gid="5" x="72" y="72" width="36" height="36"/>
+  <object id="32" gid="5" x="72" y="108" width="36" height="36"/>
+  <object id="33" gid="5" x="36" y="108" width="36" height="36"/>
+  <object id="34" gid="5" x="36" y="144" width="36" height="36"/>
+  <object id="35" gid="5" x="72" y="144" width="36" height="36"/>
+  <object id="36" gid="5" x="72" y="180" width="36" height="36"/>
+  <object id="37" gid="5" x="36" y="180" width="36" height="36"/>
+  <object id="38" gid="5" x="36" y="216" width="36" height="36"/>
+  <object id="39" gid="5" x="72" y="216" width="36" height="36"/>
+  <object id="40" name="Box" gid="4" x="144" y="288" width="36" height="36"/>
+ </objectgroup>
+</map>

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" renderorder="right-down" width="19" height="14" tilewidth="36" tileheight="36" nextobjectid="42">
+ <tileset firstgid="1" name="sokoban_tiles" tilewidth="36" tileheight="36" tilecount="6">
+  <image source="../../sokoban_tiles.png" trans="ffffff" width="216" height="36"/>
+ </tileset>
+ <layer name="Tile Layer 1" width="19" height="14">
+  <data encoding="base64" compression="zlib">
+   eJxjYCAeMBLApACQeiYcmJA92DAhs7CJ49JDLbPIcRc+9dR0F6nhic8sfADZPGLsJWQWMe4i1yx8YUUNdxEbXtT0I7GYEAAAoWIBMw==
+  </data>
+ </layer>
+ <objectgroup name="Object Layer 1">
+  <object id="1" gid="3" x="360" y="432" width="36" height="36"/>
+  <object id="2" gid="5" x="504" y="72" width="36" height="36"/>
+  <object id="3" gid="5" x="540" y="72" width="36" height="36"/>
+  <object id="4" gid="5" x="576" y="72" width="36" height="36"/>
+  <object id="5" gid="5" x="612" y="72" width="36" height="36"/>
+  <object id="6" gid="5" x="612" y="108" width="36" height="36"/>
+  <object id="7" gid="5" x="576" y="108" width="36" height="36"/>
+  <object id="8" gid="5" x="540" y="108" width="36" height="36"/>
+  <object id="9" gid="5" x="504" y="108" width="36" height="36"/>
+  <object id="10" gid="5" x="504" y="144" width="36" height="36"/>
+  <object id="11" gid="5" x="540" y="144" width="36" height="36"/>
+  <object id="12" gid="5" x="576" y="144" width="36" height="36"/>
+  <object id="13" gid="5" x="612" y="144" width="36" height="36"/>
+  <object id="14" gid="5" x="612" y="180" width="36" height="36"/>
+  <object id="15" gid="5" x="576" y="180" width="36" height="36"/>
+  <object id="16" gid="5" x="540" y="180" width="36" height="36"/>
+  <object id="17" gid="5" x="504" y="180" width="36" height="36"/>
+  <object id="18" gid="5" x="504" y="216" width="36" height="36"/>
+  <object id="19" gid="5" x="540" y="216" width="36" height="36"/>
+  <object id="20" gid="5" x="576" y="216" width="36" height="36"/>
+  <object id="21" gid="5" x="612" y="216" width="36" height="36"/>
+  <object id="22" gid="4" x="288" y="144" width="36" height="36"/>
+  <object id="23" gid="4" x="360" y="144" width="36" height="36"/>
+  <object id="24" gid="4" x="324" y="180" width="36" height="36"/>
+  <object id="25" gid="4" x="324" y="216" width="36" height="36"/>
+  <object id="26" gid="4" x="288" y="252" width="36" height="36"/>
+  <object id="27" gid="4" x="360" y="252" width="36" height="36"/>
+  <object id="28" gid="4" x="216" y="180" width="36" height="36"/>
+  <object id="29" gid="4" x="216" y="252" width="36" height="36"/>
+  <object id="30" gid="4" x="144" y="180" width="36" height="36"/>
+  <object id="31" gid="4" x="108" y="180" width="36" height="36"/>
+  <object id="32" gid="4" x="72" y="180" width="36" height="36"/>
+  <object id="33" gid="4" x="108" y="216" width="36" height="36"/>
+  <object id="34" gid="4" x="108" y="252" width="36" height="36"/>
+  <object id="35" gid="4" x="72" y="252" width="36" height="36"/>
+  <object id="36" gid="4" x="108" y="288" width="36" height="36"/>
+  <object id="37" gid="4" x="216" y="396" width="36" height="36"/>
+  <object id="38" gid="4" x="216" y="432" width="36" height="36"/>
+  <object id="39" gid="4" x="252" y="432" width="36" height="36"/>
+  <object id="40" gid="4" x="144" y="432" width="36" height="36"/>
+  <object id="41" gid="4" x="108" y="432" width="36" height="36"/>
+ </objectgroup>
+</map>

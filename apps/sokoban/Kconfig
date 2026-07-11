@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# PiZZa sokoban port -- app options.
+
+# SAMPLE_USBD_* options for sample_usbd_init.c on boards with the USB
+# device stack. Same pattern PizzaShell / Jet / wipeout / SDLPoP use.
+source "samples/subsys/usb/common/Kconfig.sample_usbd"
+
+# Shared shim: the audio-backend choice (NONE default -- sokoban makes
+# no audio calls) and the SDL2SHIM log module live here.
+rsource "../lib/sdl2shim/Kconfig"
+
+menu "PiZZa sokoban port"
+
+choice SOKOBAN_PRESENT_BACKEND
+	prompt "Frame present backend"
+	default SOKOBAN_PRESENT_DISPLAY if DISPLAY
+	default SOKOBAN_PRESENT_NONE
+
+config SOKOBAN_PRESENT_DISPLAY
+	bool "Zephyr display API (bcm2835_fb + HVS scaling on hardware)"
+	depends on DISPLAY
+
+config SOKOBAN_PRESENT_NONE
+	bool "Drop frames (link/sim bring-up)"
+
+config SOKOBAN_PRESENT_SEMIHOST
+	bool "Semihosting PPM capture (qemu sim gates)"
+	depends on SEMIHOST
+
+endchoice
+
+config SOKOBAN_CAPTURE_EVERY
+	int "Capture every Nth presented frame (0 = first frame only)"
+	depends on SOKOBAN_PRESENT_SEMIHOST
+	default 0
+
+config SOKOBAN_SCRIPTED_INPUT
+	bool "Drive the game from the scripted synthetic input timeline"
+	default n
+
+module = SOKOBAN
+module-str = sokoban
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu
+
+source "Kconfig.zephyr"
