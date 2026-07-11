@@ -75,14 +75,16 @@ set(POP_GAME_SRC
 # ── shared shim (apps/lib/sdl2shim) ─────────────────────────────────
 include(${CMAKE_CURRENT_SOURCE_DIR}/../lib/sdl2shim/sdl2shim.cmake)
 
-# SDLPoP-specific shim TUs (diverge by frame format / assets / game):
+# SDLPoP-specific shim TUs (diverge by frame format / assets / game).
+# Surfaces, RWops + the PIMG image decoder were promoted into the
+# shared shim once sokoban became their second consumer.
 set(POP_SHIM_SRC
   src/shim_main.c
   src/shim_video.c
-  src/shim_surface.c
-  src/shim_rw.c
-  src/shim_image.c
   ${SDL2SHIM_CORE_SOURCES}
+  ${SDL2SHIM_SURFACE_SOURCES}
+  ${SDL2SHIM_RW_SOURCES}
+  ${SDL2SHIM_IMAGE_PIMG_SOURCES}
 )
 
 # Audio backend (lib-owned): "none" fails SDL_OpenAudio -> game disables
@@ -171,11 +173,10 @@ target_sources(app PRIVATE
 )
 
 # include/ order: the shared shim's SDL2 headers first so <SDL2/SDL.h>
-# resolves there, then SDLPoP's include/ for <SDL2/SDL_image.h> (which the
-# lib does not carry), then the game tree.
+# (and, since the PIMG promotion, <SDL2/SDL_image.h>) resolve there,
+# then the game tree.
 target_include_directories(app PRIVATE
   ${SDL2SHIM_INCLUDE_DIRS}
-  include
   ${POP_SRC_DIR}
   src
 )
