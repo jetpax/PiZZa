@@ -28,6 +28,27 @@ set(SDL2SHIM_CORE_SOURCES
 set(SDL2SHIM_AUDIO_NONE ${SDL2SHIM_DIR}/src/audio_none.c)
 set(SDL2SHIM_USB        ${SDL2SHIM_DIR}/src/shim_usb.c)
 
+# Software surfaces/palettes/blits (promoted from SDLPoP). Required by
+# the render, TTF and PIMG groups below; apps with their own surface
+# implementation (none today) simply don't opt in.
+set(SDL2SHIM_SURFACE_SOURCES ${SDL2SHIM_DIR}/src/shim_surface.c)
+
+# Software SDL_Renderer/SDL_Texture engine over the s2s_present seam
+# (sokoban; any SDL_Renderer-API game). Requires SURFACE.
+set(SDL2SHIM_RENDER_SOURCES ${SDL2SHIM_DIR}/src/shim_render.c)
+
+# SDL2_ttf over baked S2SA glyph atlases (sdl2shim_atlas.h). Requires
+# SURFACE and an app asset store implementing s2s_asset_find.
+set(SDL2SHIM_TTF_ATLAS_SOURCES ${SDL2SHIM_DIR}/src/shim_ttf_atlas.c)
+
+# SDL2_image over pre-baked PIMG blobs (promoted from SDLPoP). Requires
+# SURFACE, RW and s2s_asset_find.
+set(SDL2SHIM_IMAGE_PIMG_SOURCES ${SDL2SHIM_DIR}/src/shim_image_pimg.c)
+
+# SDL_RWops, memory-backed (promoted from SDLPoP; RWFromFile fails
+# clean -- consumers use their pack fd layer for files).
+set(SDL2SHIM_RW_SOURCES ${SDL2SHIM_DIR}/src/shim_rw.c)
+
 # HDMI-MAI audio backend: the freestanding IEC958/resample/ring/pump
 # core (host-tested) + MAI programming + the SDL-audio-callback glue.
 set(SDL2SHIM_AUDIO_HDMI_SOURCES

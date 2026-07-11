@@ -174,6 +174,13 @@ Uint32 SDL_GetMouseState(int *x, int *y)
 	return mouse_buttons;
 }
 
+void SDL_PumpEvents(void)
+{
+	/* Producers submit asynchronously and the keyboard-state array is
+	 * updated at submit time; there is nothing to pump.
+	 */
+}
+
 void SDL_StartTextInput(void)
 {
 }

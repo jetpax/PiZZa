@@ -21,6 +21,11 @@ target_include_directories(app PRIVATE ${SDL2SHIM_INCLUDE_DIRS})
 # pick an audio backend + any opt-in pieces:
 #   ${SDL2SHIM_AUDIO_NONE}   or  ${SDL2SHIM_AUDIO_HDMI_SOURCES}
 #   ${SDL2SHIM_USB}              # CDC-ACM shell
+#   ${SDL2SHIM_SURFACE_SOURCES}  # software surfaces/blits
+#   ${SDL2SHIM_RW_SOURCES}       # memory RWops
+#   ${SDL2SHIM_RENDER_SOURCES}   # SDL_Renderer/SDL_Texture engine
+#   ${SDL2SHIM_TTF_ATLAS_SOURCES} # SDL_ttf over baked glyph atlases
+#   ${SDL2SHIM_IMAGE_PIMG_SOURCES} # SDL_image over baked PIMG blobs
 ```
 
 ... and `rsource "../lib/sdl2shim/Kconfig"` from the app Kconfig. The

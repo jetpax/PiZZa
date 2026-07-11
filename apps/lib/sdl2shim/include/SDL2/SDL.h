@@ -24,6 +24,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <wchar.h>
+#include <math.h>   /* upstream SDL_stdinc.h pulls this in too */
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,7 +51,17 @@ typedef enum { SDL_FALSE = 0, SDL_TRUE = 1 } SDL_bool;
 #define SDL_wcslen  wcslen
 #define SDL_free    free
 #define SDL_malloc  malloc
+#define SDL_strcmp  strcmp
+#define SDL_atoi    atoi
+#define SDL_snprintf snprintf
 #define SDL_arraysize(a) (sizeof(a) / sizeof((a)[0]))
+
+/* Release-SDL assert semantics: disabled, side-effect free. sizeof
+ * keeps variables referenced only in asserts "used" (upstream trick).
+ */
+#define SDL_assert(c)          do { (void)sizeof((c)); } while (0)
+#define SDL_assert_release(c)  do { (void)sizeof((c)); } while (0)
+#define SDL_assert_paranoid(c) do { (void)sizeof((c)); } while (0)
 
 char *SDL_iconv_string(const char *tocode, const char *fromcode,
 		       const char *inbuf, size_t inbytesleft);
@@ -107,7 +118,12 @@ void SDL_GetVersion(SDL_version *ver);
 #define SDL_INIT_JOYSTICK       0x00000200u
 #define SDL_INIT_HAPTIC         0x00001000u
 #define SDL_INIT_GAMECONTROLLER 0x00002000u
+#define SDL_INIT_EVENTS         0x00004000u
 #define SDL_INIT_NOPARACHUTE    0x00100000u
+#define SDL_INIT_EVERYTHING                                              \
+	(SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_VIDEO |              \
+	 SDL_INIT_EVENTS | SDL_INIT_JOYSTICK | SDL_INIT_HAPTIC |         \
+	 SDL_INIT_GAMECONTROLLER)
 
 int SDL_Init(Uint32 flags);
 int SDL_InitSubSystem(Uint32 flags);
@@ -156,6 +172,11 @@ enum {
 	 * Named to match SDL2's SDL_PIXELFORMAT_RGB888, which is 32bpp.
 	 */
 	SDL_PIXELFORMAT_RGB888,
+	/* Accepted as a texture-format label (sokoban's render-target map
+	 * texture); the render engine stores every texture as ARGB8888
+	 * internally, so this is a name, not a byte order.
+	 */
+	SDL_PIXELFORMAT_RGBA8888,
 };
 
 #define SDL_ISPIXELFORMAT_INDEXED(f) ((f) == SDL_PIXELFORMAT_INDEX8)
@@ -234,6 +255,7 @@ typedef struct SDL_Texture SDL_Texture;
 
 #define SDL_RENDERER_SOFTWARE      0x00000001u
 #define SDL_RENDERER_ACCELERATED   0x00000002u
+#define SDL_RENDERER_PRESENTVSYNC  0x00000004u
 #define SDL_RENDERER_TARGETTEXTURE 0x00000008u
 
 #define SDL_TEXTUREACCESS_STREAMING 1
@@ -300,9 +322,16 @@ int SDL_UpdateTexture(SDL_Texture *texture, const SDL_Rect *rect,
 int SDL_LockTexture(SDL_Texture *texture, const SDL_Rect *rect,
 		    void **pixels, int *pitch);
 void SDL_UnlockTexture(SDL_Texture *texture);
+SDL_Texture *SDL_CreateTextureFromSurface(SDL_Renderer *renderer, SDL_Surface *surface);
+int SDL_QueryTexture(SDL_Texture *texture, Uint32 *format, int *access, int *w, int *h);
+int SDL_SetTextureBlendMode(SDL_Texture *texture, SDL_BlendMode blendMode);
+int SDL_SetRenderDrawColor(SDL_Renderer *renderer, Uint8 r, Uint8 g, Uint8 b, Uint8 a);
 int SDL_RenderClear(SDL_Renderer *renderer);
 int SDL_RenderCopy(SDL_Renderer *renderer, SDL_Texture *texture,
 		   const SDL_Rect *srcrect, const SDL_Rect *dstrect);
+int SDL_RenderDrawLine(SDL_Renderer *renderer, int x1, int y1, int x2, int y2);
+int SDL_RenderDrawRect(SDL_Renderer *renderer, const SDL_Rect *rect);
+int SDL_RenderFillRect(SDL_Renderer *renderer, const SDL_Rect *rect);
 void SDL_RenderPresent(SDL_Renderer *renderer);
 int SDL_SetRenderTarget(SDL_Renderer *renderer, SDL_Texture *texture);
 int SDL_RenderSetLogicalSize(SDL_Renderer *renderer, int w, int h);
@@ -435,10 +464,32 @@ typedef Sint32 SDL_Keycode;
 #define SDLK_RETURN  '\r'
 #define SDLK_ESCAPE  '\x1b'
 #define SDLK_SPACE   ' '
-#define SDLK_a       'a'
-#define SDLK_d       'd'
-#define SDLK_s       's'
-#define SDLK_w       'w'
+#define SDLK_a 'a'
+#define SDLK_b 'b'
+#define SDLK_c 'c'
+#define SDLK_d 'd'
+#define SDLK_e 'e'
+#define SDLK_f 'f'
+#define SDLK_g 'g'
+#define SDLK_h 'h'
+#define SDLK_i 'i'
+#define SDLK_j 'j'
+#define SDLK_k 'k'
+#define SDLK_l 'l'
+#define SDLK_m 'm'
+#define SDLK_n 'n'
+#define SDLK_o 'o'
+#define SDLK_p 'p'
+#define SDLK_q 'q'
+#define SDLK_r 'r'
+#define SDLK_s 's'
+#define SDLK_t 't'
+#define SDLK_u 'u'
+#define SDLK_v 'v'
+#define SDLK_w 'w'
+#define SDLK_x 'x'
+#define SDLK_y 'y'
+#define SDLK_z 'z'
 #define SDLK_UP      SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_UP)
 #define SDLK_DOWN    SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_DOWN)
 #define SDLK_LEFT    SDL_SCANCODE_TO_KEYCODE(SDL_SCANCODE_LEFT)
@@ -716,6 +767,7 @@ typedef union SDL_Event {
 int SDL_PollEvent(SDL_Event *event);
 int SDL_WaitEvent(SDL_Event *event);
 int SDL_PushEvent(SDL_Event *event);
+void SDL_PumpEvents(void);
 Uint32 SDL_GetMouseState(int *x, int *y);
 void SDL_WarpMouseInWindow(SDL_Window *window, int x, int y);
 void SDL_StartTextInput(void);
