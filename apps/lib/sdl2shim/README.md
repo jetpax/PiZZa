@@ -1,14 +1,18 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # sdl2shim
 
-A minimal SDL2 / SDL_mixer shim for Zephyr. Enough of the two APIs for
-retro C games (Doom, SDLPoP, Mini vMac, DOSBox) to build and run on
-Zephyr with no real SDL, no OS, and no windowing stack. Game code keeps
-its `#include <SDL2/SDL.h>` / `<SDL2/SDL_mixer.h>` and links against
-this shim unmodified.
+A minimal SDL2 / SDL_mixer / SDL_image / SDL_ttf shim for Zephyr.
+Enough of the APIs for retro C and C++ games (Doom, SDLPoP, Mini vMac,
+DOSBox, sokoban) to build and run on Zephyr with no real SDL, no OS,
+and no windowing stack. Game code keeps its `#include <SDL2/SDL.h>`
+etc. and links against this shim unmodified. Games written against the
+`SDL_Renderer` API proper get an opt-in software renderer engine;
+images and fonts come from build-time-baked assets (PIMG blobs, S2SA
+glyph atlases) -- no decoders on the device.
 
 Consumers: [`apps/Doom`](../../Doom), [`apps/SDLPoP`](../../SDLPoP),
-[`apps/minivmac`](../../minivmac), and [`apps/DOSBox`](../../DOSBox).
+[`apps/minivmac`](../../minivmac), [`apps/DOSBox`](../../DOSBox), and
+[`apps/sokoban`](../../sokoban) (the renderer-engine worked example).
 
 ## Consuming it
 
@@ -31,7 +35,9 @@ target_include_directories(app PRIVATE ${SDL2SHIM_INCLUDE_DIRS})
 ... and `rsource "../lib/sdl2shim/Kconfig"` from the app Kconfig. The
 shim's `include/` must precede the game's own include dirs so
 `<SDL2/SDL.h>` resolves here. [`apps/Doom/CMakeLists.txt`](../../Doom)
-is the worked example.
+is the worked example for app-side composition,
+[`apps/sokoban/CMakeLists.txt`](../../sokoban) for the renderer engine
++ baked TTF/image assets.
 
 See [`NOTES.md`](NOTES.md) for what the shim provides, what it
 deliberately does not, the lib/app split, and layout.
