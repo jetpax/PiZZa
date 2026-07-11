@@ -12,15 +12,15 @@
         {
           "name": "PiZZA Boards (Pi Zero on Zephyr with Arduino)",
           "architecture": "zephyr",
-          "version": "0.6.1",
+          "version": "0.6.2",
           "category": "Contributed",
           "help": {
             "online": "https://github.com/jetpax/PiZZa#readme"
           },
-          "url": "https://github.com/jetpax/PiZZa/releases/download/arduino-core-v0.6.1/ArduinoCore-pizza-0.6.1.tar.bz2",
-          "archiveFileName": "ArduinoCore-pizza-0.6.1.tar.bz2",
-          "checksum": "SHA-256:30e18afe7a2eaa6634f1225f3a772555615d01b0ecc3143130458f90f4ad6b4d",
-          "size": "10776998",
+          "url": "https://github.com/jetpax/PiZZa/releases/download/arduino-core-v0.6.2/ArduinoCore-pizza-0.6.2.tar.bz2",
+          "archiveFileName": "ArduinoCore-pizza-0.6.2.tar.bz2",
+          "checksum": "SHA-256:f2339e1973c857c1d3cc23a958150d9f4ebb3822450b17a0040ac7a394029449",
+          "size": "10691954",
           "boards": [
             {
               "name": "PiZZa (Raspberry Pi Zero 2 W)"
