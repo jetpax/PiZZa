@@ -35,7 +35,12 @@ static const struct btinput_seam_key pad_map[] = {
 	{ 0x0c, SDL_SCANCODE_M },      /* Y (I) -> start Microban     */
 	{ 0x12, SDL_SCANCODE_R },      /* L (O) -> restart level      */
 	{ 0x11, SDL_SCANCODE_P },      /* R (N) -> pause              */
-	{ 0x16, SDL_SCANCODE_ESCAPE }, /* Home (also power-off press) */
+	/* Home fires during the pad's power-off long-press, so it must NOT
+	 * be ESCAPE: powering the pad off would quit the game (HW
+	 * 2026-07-11). No pad button quits; ESC stays reachable from a
+	 * real keyboard or `sok key esc`, and shim_main relaunches anyway.
+	 */
+	{ 0x16, SDL_SCANCODE_RETURN }, /* Home -> inert               */
 	{ 0x0e, SDL_SCANCODE_RETURN }, /* provisional -> inert        */
 	{ 0x0f, SDL_SCANCODE_RETURN }, /* provisional -> inert        */
 	{ 0x10, SDL_SCANCODE_TAB },    /* provisional -> inert        */

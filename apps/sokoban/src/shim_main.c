@@ -31,8 +31,15 @@ int main(void)
 	sokoban_btinput_start();
 #endif
 
-	int rc = SDL_main(1, argv);
+	/* The game quits on ESC, but an appliance has nothing to exit to --
+	 * relaunch at the title screen instead. App::ShutDown tears the
+	 * renderer/window down cleanly, so a fresh SDL_main re-creates them.
+	 */
+	for (;;) {
+		int rc = SDL_main(1, argv);
 
-	printf("[sokoban] game exited: %d\n", rc);
-	return rc;
+		printf("[sokoban] game exited: %d -- relaunching\n", rc);
+		k_msleep(1000);
+	}
+	return 0;
 }

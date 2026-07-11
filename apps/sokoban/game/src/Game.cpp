@@ -657,6 +657,19 @@ void Game::Draw( Renderer& renderer )
 			renderer.GetTextDimensions( *m_pFont, text, width, height );
 			y += 4 * m_pFont->size;
 			renderer.DrawText( *m_pFont, text, (renderer.GetLogicalWidth() - width) / 2, y, 0xffffffff );
+
+#ifdef CONFIG_BTINPUT
+			// PiZZa: BT pad legend (mapping in sokoban_btinput.c)
+			SDL_snprintf( text, sizeof(text), "PAD: X ORIGINAL   Y MICROBAN" );
+			renderer.GetTextDimensions( *m_pFont, text, width, height );
+			y += 6 * m_pFont->size;
+			renderer.DrawText( *m_pFont, text, (renderer.GetLogicalWidth() - width) / 2, y, 0xff8888ff );
+
+			SDL_snprintf( text, sizeof(text), "B UNDO   L RESTART   A CONTINUE" );
+			renderer.GetTextDimensions( *m_pFont, text, width, height );
+			y += 3 * m_pFont->size;
+			renderer.DrawText( *m_pFont, text, (renderer.GetLogicalWidth() - width) / 2, y, 0xff8888ff );
+#endif
 			break;
 		}
 		case kStatePlaying:
@@ -764,12 +777,21 @@ void Game::DrawHUD( Renderer& renderer )
 	// HUD
 	char text[128];
 
+#ifdef CONFIG_BTINPUT
+	// PiZZa: name the pad buttons too (mapping in sokoban_btinput.c)
+	SDL_snprintf( text, sizeof(text), "R / pad L: restart" );
+#else
 	SDL_snprintf( text, sizeof(text), "Press R to restart level" );
+#endif
 	int width, height;
 	renderer.GetTextDimensions( *m_pFont, text, width, height );
 	renderer.DrawText( *m_pFont, text, (1 * renderer.GetLogicalWidth() / 4 ) - (width / 2), renderer.GetLogicalHeight() - m_pFont->size - 1, 0xffffffff );
 
+#ifdef CONFIG_BTINPUT
+	SDL_snprintf( text, sizeof(text), "U / pad B: undo" );
+#else
 	SDL_snprintf( text, sizeof(text), "Press U to undo move" );
+#endif
 	renderer.GetTextDimensions( *m_pFont, text, width, height );
 	renderer.DrawText( *m_pFont, text, (3 * renderer.GetLogicalWidth() / 4) - (width / 2), renderer.GetLogicalHeight() - m_pFont->size - 1, 0xffffffff );
 

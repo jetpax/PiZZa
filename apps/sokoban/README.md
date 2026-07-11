@@ -49,9 +49,21 @@ it back through the real device parsers) and the shim's
 ## Controls
 
 Title: `O` original levels, `M` microban levels. In game: arrows move,
-`R` restart, `U` undo, `P` pause, `SPACE` next level, `ESC` quit.
+`R` restart, `U` undo, `P` pause, `SPACE` next level, `ESC` back to
+the title (the Zephyr entry relaunches the game; an appliance has
+nothing to exit to).
 
-On hardware, keys arrive over the USB CDC ACM shell:
+On `rpi_zero_2w` a Bluetooth pad or keyboard drives the game via
+[`apps/lib/btinput`](../lib/btinput) (first pairing: boot inquiry
+finds a discoverable pad; bonds persist on the SD card). The 8BitDo
+Micro K-mode mapping (`src/sokoban_btinput.c`, legend on the title
+screen): d-pad moves, `X` Original, `Y` Microban, `A` continue,
+`B` undo, `L` restart, `R` pause. No pad button quits -- the pad's
+power-off long-press fires Home, so Home is deliberately inert.
+A real BT keyboard passes through unmapped (its O/M/R/U/arrows just
+work).
+
+Keys also arrive over the USB CDC ACM shell:
 
 ```
 sok key o

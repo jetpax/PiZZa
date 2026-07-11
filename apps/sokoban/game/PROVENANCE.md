@@ -22,3 +22,6 @@ Local patches (all marked with a `PiZZa:` comment at the site):
 - `src/Game.cpp`: one `printf` per state transition (title/playing/
   level-complete/game-complete) -- console tracing for headless sim
   gates and hardware bring-up.
+- `src/Game.cpp`: `#ifdef CONFIG_BTINPUT` pad-button legend on the
+  title screen + HUD (the BT pad mapping in sokoban_btinput.c is
+  otherwise invisible to the player).
