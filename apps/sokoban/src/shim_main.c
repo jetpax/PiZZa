@@ -13,6 +13,10 @@
 
 #include "sdl2shim.h"
 
+#ifdef CONFIG_BTINPUT
+void sokoban_btinput_start(void);
+#endif
+
 int main(void)
 {
 	static char *argv[] = { "sokoban", NULL };
@@ -22,6 +26,10 @@ int main(void)
 	if (IS_ENABLED(CONFIG_SOKOBAN_SCRIPTED_INPUT)) {
 		s2s_scripted_input_start();
 	}
+
+#ifdef CONFIG_BTINPUT
+	sokoban_btinput_start();
+#endif
 
 	int rc = SDL_main(1, argv);
 
