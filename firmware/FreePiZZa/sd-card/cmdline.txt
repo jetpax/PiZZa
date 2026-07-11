@@ -1,7 +1,0 @@
-# cmdline.txt — Kernel command line (if loading Linux after firmware)
-#
-# For bare-metal experiments (Phase 0-5), this file is not used.
-# When we get to Phase 6 (Linux integration), this tells the kernel
-# where to find root filesystem and enables serial console.
-#
-# console=serial0,115200 root=/dev/mmcblk0p2 rootfstype=ext4 rootwait

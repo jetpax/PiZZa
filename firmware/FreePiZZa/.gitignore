@@ -1,3 +1,0 @@
-# Build artifacts — reproducible via `make docker-build` in ~/github/vc4-suspend
-# with the integration/ patches applied. See HANDOVER.md §5.
-build/
