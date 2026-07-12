@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# sokoban core build -- pulls the shim's Kconfig for the SDL2SHIM_*
+# symbols the shim TUs compile against (log level, libretro app
+# stack). The audio-backend choice is irrelevant here (the core links
+# the libretro audio backend directly).
+
+rsource "../../lib/sdl2shim/Kconfig"
+
+source "Kconfig.zephyr"

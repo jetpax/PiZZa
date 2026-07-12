@@ -39,6 +39,14 @@ config SDL2SHIM_AUDIO_HDMI_TEST_TONE
 	  The game still runs but its Mix_OpenAudio fails while the tone owns
 	  the path. Check with the `doom audio` shell command.
 
+config SDL2SHIM_LIBRETRO_APP_STACK
+	int "Game-thread stack size for libretro-core builds"
+	default 65536
+	help
+	  Stack for the dedicated thread shim_libretro.c runs the game's
+	  SDL_main on when the shim consumer is built as a libretro core.
+	  Size it like the app's CONFIG_MAIN_STACK_SIZE would be.
+
 module = SDL2SHIM
 module-str = sdl2shim
 source "subsys/logging/Kconfig.template.log_config"

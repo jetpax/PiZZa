@@ -1,0 +1,14 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * 640x480 virtual-FB override for cores with 640x480 geometry
+ * (sokoban, sdlpop-class). 640 * 4 = 2560 B/row, 64-byte aligned.
+ * Use: -DEXTRA_DTC_OVERLAY_FILE=overlays/render640.overlay
+ * Until M4 grows a runtime-sized FB story, one image per core
+ * geometry class.
+ */
+
+&vc_fb {
+	render-width = <640>;
+	render-height = <480>;
+};

@@ -56,6 +56,13 @@ static void script_main(void *a, void *b, void *c)
 	press(SDL_SCANCODE_RETURN, 150);
 	k_msleep(400);
 
+	/* Retropad X (scancode S in the frontend map): starts a game on
+	 * cores whose action button is X (sokoban: X -> 'O' -> Original
+	 * levels). 2048 ignores it.
+	 */
+	press(SDL_SCANCODE_S, 150);
+	k_msleep(400);
+
 	for (int i = 0; i < 48; i++) {
 		press(dirs[i % 4], 100);
 		k_msleep(350);

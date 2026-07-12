@@ -60,6 +60,18 @@ set(SDL2SHIM_AUDIO_HDMI_SOURCES
   ${SDL2SHIM_DIR}/src/audio/hdmi_audio_init.c
 )
 
+# sdl2shim-over-libretro: the generic glue that turns a shim consumer
+# into a libretro core (retro_* ABI exports + rendezvous inversion +
+# retropad->SDL input synthesis + audio pump). Core builds link this
+# INSTEAD of a present backend and INSTEAD of audio_none/hdmi; C++
+# games append SDL2SHIM_LIBRETRO_CXXRT (minimal ABI runtime -- partial
+# link pulls no libstdc++).
+set(SDL2SHIM_LIBRETRO_SOURCES
+  ${SDL2SHIM_DIR}/src/shim_libretro.c
+  ${SDL2SHIM_DIR}/src/shim_audio_libretro.c
+)
+set(SDL2SHIM_LIBRETRO_CXXRT ${SDL2SHIM_DIR}/src/shim_cxxrt.cpp)
+
 set(SDL2SHIM_INCLUDE_DIRS
   ${SDL2SHIM_DIR}/include
   ${SDL2SHIM_DIR}
