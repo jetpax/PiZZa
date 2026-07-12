@@ -13,6 +13,38 @@ rsource "../lib/btinput/Kconfig"
 
 menu "PiZZa libretro frontend"
 
+choice RETRO_CORE_SOURCE
+	prompt "libretro core source"
+	default RETRO_CORE_STATIC
+
+config RETRO_CORE_STATIC
+	bool "Statically linked core (fused binary, RetroArch console model)"
+
+config RETRO_CORE_LLEXT_EMBED
+	bool "llext core embedded in the image (buf loader; sim)"
+	depends on LLEXT
+
+config RETRO_CORE_LLEXT_FS
+	bool "llext core from the filesystem (fs loader; SD card)"
+	depends on LLEXT && FILE_SYSTEM
+
+endchoice
+
+config RETRO_CORE_LLEXT_PATH
+	string "Filesystem path of the core llext"
+	depends on RETRO_CORE_LLEXT_FS
+	default "/SD:/cores/2048.llext"
+
+config RETRO_LLEXT_CYCLE_TEST
+	int "Frames per bind cycle before unload/reload (0 = run forever)"
+	default 0
+	help
+	  M2 gate: run N frames, tear the core down (unload_game, deinit,
+	  llext unload), and let main() relaunch the frontend, which
+	  reloads the core from scratch. The llext heap watermark is
+	  logged pre-bind/post-unbind; allocated bytes must return to
+	  baseline every cycle.
+
 choice RETRO_PRESENT_BACKEND
 	prompt "Frame present backend"
 	default RETRO_PRESENT_DISPLAY if DISPLAY

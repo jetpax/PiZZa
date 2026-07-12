@@ -24,13 +24,41 @@
 #include "sdl2shim.h"
 #include <libretro.h>
 #include "retro_frontend.h"
+#include "retro_core.h"
 
 LOG_MODULE_REGISTER(retro, CONFIG_RETRO_LOG_LEVEL);
 
+static struct retro_core_api core;
 static enum retro_pixel_format pixfmt = RETRO_PIXEL_FORMAT_0RGB1555;
 static struct retro_frame_time_callback frame_time_cb;
 static bool support_no_game;
 static bool present_ready;
+
+/* llext heap watermark (cycle-test evidence: allocated must return to
+ * baseline after every unbind).
+ */
+#if defined(CONFIG_SYS_HEAP_RUNTIME_STATS) && defined(CONFIG_LLEXT)
+#include <zephyr/sys/sys_heap.h>
+#include <zephyr/sys/mem_stats.h>
+
+extern struct k_heap llext_heap;
+
+static void log_llext_heap(const char *tag)
+{
+	struct sys_memory_stats st;
+
+	if (sys_heap_runtime_stats_get(&llext_heap.heap, &st) == 0) {
+		printf("[retro] llext heap %s: alloc %zu free %zu max %zu\n",
+		       tag, st.allocated_bytes, st.free_bytes,
+		       st.max_allocated_bytes);
+	}
+}
+#else
+static void log_llext_heap(const char *tag)
+{
+	(void)tag;
+}
+#endif
 
 /* RETRO_DEVICE_ID_JOYPAD_* (0..15) -> SDL scancode in the shim's
  * keyboard-state array. Arrows/START/SELECT are what 2048 uses; the
@@ -190,30 +218,47 @@ int retro_frontend_run(void)
 	struct retro_system_info si;
 	struct retro_system_av_info av;
 	struct k_timer frame_timer;
+	int rc;
 
-	retro_set_environment(env_cb);
-	retro_set_video_refresh(video_cb);
-	retro_set_audio_sample(audio_sample_cb);
-	retro_set_audio_sample_batch(audio_batch_cb);
-	retro_set_input_poll(input_poll_cb);
-	retro_set_input_state(input_state_cb);
+	/* Fresh per-bind state (the frontend relaunches across core
+	 * load/unload cycles).
+	 */
+	pixfmt = RETRO_PIXEL_FORMAT_0RGB1555;
+	memset(&frame_time_cb, 0, sizeof(frame_time_cb));
+	support_no_game = false;
+	present_ready = false;
 
-	retro_init();
+	log_llext_heap("pre-bind");
+	rc = retro_core_bind(&core);
+	if (rc != 0) {
+		printf("[retro] core bind failed (%d)\n", rc);
+		return rc;
+	}
+
+	core.set_environment(env_cb);
+	core.set_video_refresh(video_cb);
+	core.set_audio_sample(audio_sample_cb);
+	core.set_audio_sample_batch(audio_batch_cb);
+	core.set_input_poll(input_poll_cb);
+	core.set_input_state(input_state_cb);
+
+	core.init();
 
 	memset(&si, 0, sizeof(si));
-	retro_get_system_info(&si);
-	printf("[retro] core: %s %s (no_game=%d)\n",
+	core.get_system_info(&si);
+	printf("[retro] core: %s %s (no_game=%d, api %u)\n",
 	       si.library_name ? si.library_name : "?",
 	       si.library_version ? si.library_version : "?",
-	       (int)support_no_game);
+	       (int)support_no_game, core.api_version());
 
-	if (!retro_load_game(NULL)) {
+	if (!core.load_game(NULL)) {
 		printf("[retro] retro_load_game(NULL) failed\n");
-		retro_deinit();
+		core.deinit();
+		retro_core_unbind();
 		return -1;
 	}
 
-	retro_get_system_av_info(&av);
+	core.get_system_av_info(&av);
 	printf("[retro] geometry %ux%u max %ux%u fps %d sample_rate %d\n",
 	       av.geometry.base_width, av.geometry.base_height,
 	       av.geometry.max_width, av.geometry.max_height,
@@ -233,6 +278,7 @@ int retro_frontend_run(void)
 	k_timer_start(&frame_timer, K_USEC(period_us), K_USEC(period_us));
 
 	uint64_t last_us = k_ticks_to_us_floor64(k_uptime_ticks());
+	uint32_t frames_run = 0;
 
 	for (;;) {
 		uint64_t now_us = k_ticks_to_us_floor64(k_uptime_ticks());
@@ -243,11 +289,25 @@ int retro_frontend_run(void)
 		}
 		last_us = now_us;
 
-		retro_run();
+		core.run();
+		frames_run++;
+
+		if (CONFIG_RETRO_LLEXT_CYCLE_TEST > 0 &&
+		    frames_run >= CONFIG_RETRO_LLEXT_CYCLE_TEST) {
+			break;
+		}
 
 		k_timer_status_sync(&frame_timer);
 	}
 
-	CODE_UNREACHABLE;
+	/* Cycle-test path: full teardown, then the caller relaunches
+	 * and the next bind reloads the core from scratch.
+	 */
+	k_timer_stop(&frame_timer);
+	printf("[retro] cycle: ran %u frames, unloading core\n", frames_run);
+	core.unload_game();
+	core.deinit();
+	retro_core_unbind();
+	log_llext_heap("post-unbind");
 	return 0;
 }

@@ -59,7 +59,12 @@ int s2s_present_init(int width, int height)
 		return -EINVAL;
 	}
 
-	backbuf = malloc((size_t)disp_w * disp_h * 4);
+	/* Re-init across core load/unload cycles reuses the buffer
+	 * (display geometry is boot-constant).
+	 */
+	if (!backbuf) {
+		backbuf = malloc((size_t)disp_w * disp_h * 4);
+	}
 	if (!backbuf) {
 		LOG_ERR("present: backbuffer alloc failed (%dx%d)",
 			disp_w, disp_h);

@@ -29,12 +29,21 @@ if(NOT DEFINED ENV{LIBRETRO_2048_SRC_DIR})
 endif()
 set(CORE_DIR $ENV{LIBRETRO_2048_SRC_DIR})
 
-# The non-cairo software renderer build: 3 TUs, XRGB8888.
-set(RETRO_CORE_SRC
-  ${CORE_DIR}/libretro.c
-  ${CORE_DIR}/game_noncairo.c
-  ${CORE_DIR}/game_shared.c
-)
+# Core source (Kconfig choice):
+#  - STATIC: the 3 core TUs compile into the image (fused binary).
+#  - LLEXT_EMBED / LLEXT_FS: the core is a separate 2048.llext built
+#    by core2048/ (west build -t core2048); the image carries only the
+#    binder + symbol exports. EMBED additionally .incbin's the .llext
+#    (RETRO_CORE_LLEXT env names the file) for boards with no SD.
+set(RETRO_CORE_SRC)
+if(CONFIG_RETRO_CORE_STATIC)
+  # The non-cairo software renderer build: 3 TUs, XRGB8888.
+  set(RETRO_CORE_SRC
+    ${CORE_DIR}/libretro.c
+    ${CORE_DIR}/game_noncairo.c
+    ${CORE_DIR}/game_shared.c
+  )
+endif()
 
 # ── shared shim (apps/lib/sdl2shim): CORE group only ────────────────
 # The frontend makes no SDL draw calls; it consumes the event queue
@@ -48,6 +57,25 @@ set(RETRO_SRC
   src/retro_vfs_stubs.c
   ${SDL2SHIM_CORE_SOURCES}
 )
+
+if(CONFIG_RETRO_CORE_STATIC)
+  list(APPEND RETRO_SRC src/retro_core_static.c)
+else()
+  list(APPEND RETRO_SRC src/retro_core_llext.c src/retro_llext_exports.c)
+endif()
+
+if(CONFIG_RETRO_CORE_LLEXT_EMBED)
+  if(NOT DEFINED ENV{RETRO_CORE_LLEXT})
+    message(FATAL_ERROR
+      "retro: RETRO_CORE_LLEXT_EMBED needs the RETRO_CORE_LLEXT env "
+      "pointing at a built .llext (west build -t core2048 in core2048/)")
+  endif()
+  list(APPEND RETRO_SRC src/retro_core_pack.S)
+  set_source_files_properties(src/retro_core_pack.S PROPERTIES
+    OBJECT_DEPENDS $ENV{RETRO_CORE_LLEXT}
+    COMPILE_DEFINITIONS "RETRO_CORE_LLEXT_PATH=\"$ENV{RETRO_CORE_LLEXT}\""
+  )
+endif()
 
 # Audio backend (lib-owned). 2048 emits no audio; shim_stub.c still
 # delegates to the s2s_audio_* seam, so a backend TU must link.
