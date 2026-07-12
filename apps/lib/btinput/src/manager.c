@@ -56,6 +56,7 @@
 #endif
 
 #include "btinput.h"
+#include "btinput_priv.h"
 
 LOG_MODULE_REGISTER(btinput_mgr, CONFIG_BTINPUT_LOG_LEVEL);
 
@@ -159,7 +160,32 @@ struct br_watch {
 	struct k_work_delayable page_work;
 	bool used;
 	bool bonded;
+	int fail_count;         /* consecutive rescue-page failures */
 };
+
+/* Rescue-page backoff. The old code re-armed a bonded page every 3.5 s
+ * FOREVER while a bonded pad was unreachable -- thousands of
+ * bt_conn_create_br (HCI_Create_Connection) commands over hours, which
+ * on the AIROC 43430 eventually provoked a controller hardware error
+ * and an unrecoverable host assert (whole appliance down). An absent
+ * pad will not answer a page anyway; it reconnects device-initiated
+ * (inbound) when it returns, and we stay page-scannable. So: try a
+ * short backed-off burst after each disconnect, then STOP.
+ */
+#define RESCUE_MAX_FAILS 6
+
+static uint32_t rescue_backoff_ms(int fails)
+{
+	static const uint32_t tbl[] = { 1200, 3500, 7000, 14000, 30000 };
+
+	if (fails < 0) {
+		fails = 0;
+	}
+	if (fails >= (int)ARRAY_SIZE(tbl)) {
+		return tbl[ARRAY_SIZE(tbl) - 1];
+	}
+	return tbl[fails];
+}
 
 static struct br_watch watches[CONFIG_BTINPUT_MAX_DEVICES];
 
@@ -187,10 +213,29 @@ static struct br_watch *watch_claim(const bt_addr_t *addr)
 			w->addr = *addr;
 			w->conn = NULL;
 			w->bonded = false;
+			w->fail_count = 0;
 			return w;
 		}
 	}
 	return NULL;
+}
+
+/* A rescue page failed: back off, or give up once the burst is spent
+ * (the pad reconnects inbound when it actually returns).
+ */
+static void rescue_failed(struct br_watch *w)
+{
+	char str[BT_ADDR_STR_LEN];
+
+	w->fail_count++;
+	if (w->fail_count >= RESCUE_MAX_FAILS) {
+		bt_addr_to_str(&w->addr, str, sizeof(str));
+		LOG_INF("%s unreachable after %d pages -- stopping rescue "
+			"(still connectable for inbound reconnect)",
+			str, w->fail_count);
+		return;
+	}
+	k_work_schedule(&w->page_work, K_MSEC(rescue_backoff_ms(w->fail_count)));
 }
 
 static void page_fn(struct k_work *work)
@@ -216,11 +261,17 @@ static void page_fn(struct k_work *work)
 	LOG_INF("paging %s%s", str, w->bonded ? " (rescue)" : " (first pair)");
 
 	br_paging = true;
+	/* Guard the HCI sync command: a wedged controller makes this
+	 * assert fatal inside the host; the guard turns that into a clean
+	 * reboot (CONFIG_BTINPUT_WEDGE_REBOOT) instead of a hung system.
+	 */
+	btinput_wedge_arm();
 	w->conn = bt_conn_create_br(&w->addr, BT_BR_CONN_PARAM_DEFAULT);
+	btinput_wedge_disarm();
 	if (w->conn == NULL) {
 		br_paging = false;
-		LOG_WRN("page create failed; retry in 3.5 s");
-		k_work_schedule(&w->page_work, K_MSEC(3500));
+		LOG_WRN("page create failed");
+		rescue_failed(w);
 	}
 	/* Success/failure of the page itself lands in mgr_connected(). */
 }
@@ -551,17 +602,16 @@ static void mgr_connected(struct bt_conn *conn, uint8_t err)
 
 		if (err) {
 			if (w != NULL && w->conn == conn) {
-				/* Our page failed. Bonded devices get the
-				 * forever-retry (the pad's own attempts may
-				 * be storming; 3.5 s stays off its beat);
-				 * a first-pair page is one-shot.
+				/* Our page failed. A bonded pad gets a
+				 * backed-off burst then we give up (see
+				 * rescue_failed); a first-pair page is
+				 * one-shot.
 				 */
 				br_paging = false;
 				bt_conn_unref(w->conn);
 				w->conn = NULL;
 				if (w->bonded) {
-					k_work_schedule(&w->page_work,
-							K_MSEC(3500));
+					rescue_failed(w);
 				} else {
 					w->used = false;
 				}
@@ -582,7 +632,10 @@ static void mgr_connected(struct bt_conn *conn, uint8_t err)
 			} else if (w->conn == NULL) {
 				w->conn = bt_conn_ref(conn);
 			}
-			/* Inbound landed: retire any pending rescue page. */
+			/* Reachable again: reset the rescue backoff and
+			 * retire any pending page.
+			 */
+			w->fail_count = 0;
 			k_work_cancel_delayable(&w->page_work);
 		}
 		/* Security + HID channels are hid_host_br.c's job. */
@@ -628,12 +681,13 @@ static void mgr_disconnected(struct bt_conn *conn, uint8_t reason)
 		w->conn = NULL;
 
 		if (w->bonded) {
-			/* Re-arm the rescue. 1.2 s, deliberately NOT 2-3 s:
-			 * that matched the pad's own retry cadence and paged
-			 * into its storm forever; aim for the listen window
-			 * right after its attempt dies. An inbound connect
-			 * cancels this.
+			/* Start a fresh rescue burst. 1.2 s (backoff step 0),
+			 * deliberately NOT 2-3 s: that matched the pad's own
+			 * retry cadence and paged into its storm. An inbound
+			 * connect cancels this; repeated failures back off and
+			 * then stop (rescue_failed).
 			 */
+			w->fail_count = 0;
 			k_work_schedule(&w->page_work, K_MSEC(1200));
 		} else {
 			w->used = false;

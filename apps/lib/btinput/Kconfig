@@ -92,6 +92,21 @@ config BTINPUT_MANAGER_MOUNT
 	  CONFIG_SETTINGS_FILE_PATH must live under it. An unmountable card
 	  degrades to RAM-only bonds; input still works for the boot.
 
+config BTINPUT_WEDGE_REBOOT
+	bool "Cold-reboot recovery on a controller wedge"
+	depends on BTINPUT_MANAGER
+	select REBOOT
+	help
+	  The AIROC controller can raise a hardware error and stop
+	  answering HCI commands; the host then asserts fatally inside the
+	  next sync command (the manager's rescue page), hanging the
+	  appliance. With this on, such a fault triggers a clean cold
+	  reboot (via the SoC watchdog) so the device self-heals instead
+	  of freezing. Scoped to the rescue page, which only runs while
+	  the pad is disconnected, so recovery never interrupts active
+	  play, and an init-time fault still halts (no reboot loop).
+	  Requires a working sys_reboot() on the SoC (BCM2710 has one).
+
 module = BTINPUT
 module-str = btinput
 source "subsys/logging/Kconfig.template.log_config"

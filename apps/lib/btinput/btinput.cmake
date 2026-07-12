@@ -33,6 +33,9 @@ endif()
 if(CONFIG_BTINPUT_MANAGER)
   list(APPEND BTINPUT_SOURCES ${BTINPUT_DIR}/src/manager.c)
 endif()
+if(CONFIG_BTINPUT_WEDGE_REBOOT)
+  list(APPEND BTINPUT_SOURCES ${BTINPUT_DIR}/src/wedge_guard.c)
+endif()
 
 set(BTINPUT_INCLUDE_DIRS
   ${BTINPUT_DIR}
