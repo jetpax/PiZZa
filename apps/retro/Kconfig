@@ -35,6 +35,46 @@ config RETRO_CORE_LLEXT_PATH
 	depends on RETRO_CORE_LLEXT_FS
 	default "/SD:/cores/2048.llext"
 
+config RETRO_STORAGE_MOUNT
+	string "Storage volume the frontend mounts (cores + saves)"
+	depends on RETRO_CORE_LLEXT_FS
+	default "/SD:"
+
+config RETRO_MENU
+	bool "Launcher menu (scan a cores dir, pick + swap in-process)"
+	depends on RETRO_CORE_LLEXT_FS
+	default y
+	help
+	  M4: on boot show a picker of the *.llext cores in
+	  RETRO_MENU_DIR; launching one binds + runs it; the L+R pad
+	  chord or `retro menu` tears it down and returns to the picker.
+	  Without this the frontend runs the single RETRO_CORE_LLEXT_PATH
+	  core forever (M3 behavior).
+
+config RETRO_MENU_DIR
+	string "Directory scanned for core llext files"
+	depends on RETRO_MENU
+	default "/SD:/cores"
+
+config RETRO_MENU_WIDTH
+	int "Launcher render width (match the board's virtual FB)"
+	depends on RETRO_MENU
+	default 640
+
+config RETRO_MENU_HEIGHT
+	int "Launcher render height (match the board's virtual FB)"
+	depends on RETRO_MENU
+	default 480
+
+config RETRO_QEMU_RAMDISK_SEED
+	bool "Seed the qemu ram-disk with embedded cores (sim menu test)"
+	depends on RETRO_CORE_LLEXT_FS && DISK_DRIVER_RAM
+	default n
+	help
+	  qemu has no SD: this writes cores .incbin'd into the image onto
+	  the formatted ram-disk at boot so the launcher's fs scan + swap
+	  exercises the exact HW path.
+
 config RETRO_LLEXT_CYCLE_TEST
 	int "Frames per bind cycle before unload/reload (0 = run forever)"
 	default 0

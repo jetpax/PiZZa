@@ -37,7 +37,13 @@ static const struct btinput_seam_key pad_map[] = {
 	{ 0x0c, SDL_SCANCODE_S },      /* Y (I) -> retropad X          */
 	{ 0x12, SDL_SCANCODE_Q },      /* L (O) -> retropad L          */
 	{ 0x11, SDL_SCANCODE_W },      /* R (N) -> retropad R          */
-	{ 0x16, SDL_SCANCODE_P },      /* Home -> inert (power-off)    */
+	/* Home -> return to the launcher. A single button (no two-key
+	 * rollover, unlike the L+R chord) mapped to ESCAPE, which is not
+	 * in the frontend joypad table so cores never see it. Home also
+	 * fires on the pad's power-off long-press: harmless now (it just
+	 * pops the launcher), unlike the old game-quit behavior.
+	 */
+	{ 0x16, SDL_SCANCODE_ESCAPE }, /* Home -> launcher             */
 	{ 0x0e, SDL_SCANCODE_P },      /* provisional -> inert         */
 	{ 0x0f, SDL_SCANCODE_P },      /* provisional -> inert         */
 	{ 0x10, SDL_SCANCODE_P },      /* provisional -> inert         */

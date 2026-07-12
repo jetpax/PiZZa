@@ -1,0 +1,17 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * A RAM-backed FAT disk ("RAM") for the M4 launcher sim gate: stands in
+ * for the SD card, formatted on first mount and seeded with the two
+ * embedded cores (retro_qemu_seed.c). ~2 MB holds 2048.llext (46 KB) +
+ * sokoban.llext (160 KB) plus FAT overhead.
+ */
+
+/ {
+	ramdisk0 {
+		compatible = "zephyr,ram-disk";
+		disk-name = "RAM";
+		sector-size = <512>;
+		sector-count = <4000>;
+	};
+};

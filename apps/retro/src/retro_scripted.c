@@ -4,10 +4,11 @@
  * PiZZa libretro frontend -- scripted synthetic input
  * (CONFIG_RETRO_SCRIPTED_INPUT, qemu sim gate).
  *
- * 2048 timeline: the title screen advances on a START *release* edge
- * (game_shared.c handle_input), then tiles move on arrow press edges.
- * Alternating directions guarantees board movement regardless of tile
- * spawns.
+ * Two timelines:
+ *  - CONFIG_RETRO_MENU: drive the launcher -- launch the first core,
+ *    play, L+R back to the menu, navigate to the second, launch, play.
+ *    Exercises the fs scan + in-process swap in sim.
+ *  - single-core: START then arrows (the 2048 opening).
  */
 
 #include <zephyr/kernel.h>
@@ -38,13 +39,73 @@ static void press(SDL_Scancode sc, int hold_ms)
 	submit_key(sc, SDL_KEYUP);
 }
 
+#ifdef CONFIG_RETRO_MENU
+/* The L+R return-to-menu chord: both shoulders (Q/W in the frontend
+ * map) held together.
+ */
+static void press_menu_chord(void)
+{
+	submit_key(SDL_SCANCODE_Q, SDL_KEYDOWN);
+	submit_key(SDL_SCANCODE_W, SDL_KEYDOWN);
+	k_msleep(300);
+	submit_key(SDL_SCANCODE_Q, SDL_KEYUP);
+	submit_key(SDL_SCANCODE_W, SDL_KEYUP);
+}
+
+static void play_a_bit(void)
+{
+	static const SDL_Scancode dirs[] = {
+		SDL_SCANCODE_UP, SDL_SCANCODE_LEFT,
+		SDL_SCANCODE_DOWN, SDL_SCANCODE_RIGHT,
+	};
+
+	/* Cover both games' "start": 2048 wants retropad START (RETURN);
+	 * sokoban wants retropad X, which is SDL_SCANCODE_S in the
+	 * frontend map (-> the core's 'O' = Original levels).
+	 */
+	press(SDL_SCANCODE_RETURN, 120);
+	k_msleep(300);
+	press(SDL_SCANCODE_S, 120);
+	k_msleep(600);
+
+	for (int i = 0; i < 8; i++) {
+		press(dirs[i % 4], 100);
+		k_msleep(400);
+	}
+}
+
+static void script_main(void *a, void *b, void *c)
+{
+	ARG_UNUSED(a);
+	ARG_UNUSED(b);
+	ARG_UNUSED(c);
+
+	k_msleep(3000);
+	printf("[retro] scripted: launch first core\n");
+	press(SDL_SCANCODE_X, 150); /* A = launch highlighted (entry 0) */
+	k_msleep(5000);
+	play_a_bit();
+
+	printf("[retro] scripted: L+R back to launcher\n");
+	press_menu_chord();
+	k_msleep(3000);
+
+	printf("[retro] scripted: pick + launch second core\n");
+	press(SDL_SCANCODE_DOWN, 150); /* select entry 1 */
+	k_msleep(500);
+	press(SDL_SCANCODE_X, 150);     /* launch */
+	k_msleep(5000);
+	play_a_bit();
+
+	printf("[retro] scripted: L+R back to launcher (done)\n");
+	press_menu_chord();
+}
+#else
 static void script_main(void *a, void *b, void *c)
 {
 	static const SDL_Scancode dirs[] = {
-		SDL_SCANCODE_UP,
-		SDL_SCANCODE_LEFT,
-		SDL_SCANCODE_DOWN,
-		SDL_SCANCODE_RIGHT,
+		SDL_SCANCODE_UP, SDL_SCANCODE_LEFT,
+		SDL_SCANCODE_DOWN, SDL_SCANCODE_RIGHT,
 	};
 
 	ARG_UNUSED(a);
@@ -69,6 +130,7 @@ static void script_main(void *a, void *b, void *c)
 	}
 	printf("[retro] scripted: timeline done\n");
 }
+#endif
 
 void s2s_scripted_input_start(void)
 {

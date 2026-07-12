@@ -54,4 +54,9 @@ int retro_core_bind(struct retro_core_api *api);
  */
 void retro_core_unbind(void);
 
+/* Choose which core the next bind loads (llext FS binder only; no-op
+ * for static/embedded). The launcher menu sets this per selection.
+ */
+void retro_core_set_path(const char *path);
+
 #endif /* PIZZA_RETRO_CORE_H */

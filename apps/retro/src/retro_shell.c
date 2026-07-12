@@ -95,10 +95,27 @@ static int retro_shell_init(void)
 
 SYS_INIT(retro_shell_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
 
+#ifdef CONFIG_RETRO_MENU
+#include "retro_frontend.h"
+
+static int cmd_retro_menu(const struct shell *sh, size_t argc, char **argv)
+{
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+	retro_request_menu();
+	shell_print(sh, "returning to launcher");
+	return 0;
+}
+#endif
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_retro,
 	SHELL_CMD_ARG(key, NULL,
 		      "inject a retropad press: retro key <name> [hold_ms]",
 		      cmd_retro_key, 2, 1),
+#ifdef CONFIG_RETRO_MENU
+	SHELL_CMD(menu, NULL, "tear down the running core, return to launcher",
+		  cmd_retro_menu),
+#endif
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(retro, &sub_retro, "libretro frontend controls", NULL);

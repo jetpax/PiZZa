@@ -41,3 +41,8 @@ int retro_core_bind(struct retro_core_api *api)
 void retro_core_unbind(void)
 {
 }
+
+void retro_core_set_path(const char *path)
+{
+	(void)path;
+}

@@ -213,6 +213,38 @@ static int16_t input_state_cb(unsigned int port, unsigned int device,
 	return 0;
 }
 
+#ifdef CONFIG_RETRO_MENU
+static volatile bool menu_flag;
+
+void retro_request_menu(void)
+{
+	menu_flag = true;
+}
+
+/* Return to the launcher on the pad's Home button (a single button,
+ * mapped to ESCAPE in retro_btinput.c -- reliable, unlike a two-button
+ * chord the tiny 8BitDo may not report together), the L+R chord, or a
+ * `retro menu` shell request. Reads the persistent keyboard-state
+ * array, so it never competes with the core's own event draining.
+ */
+static bool menu_requested(void)
+{
+	const Uint8 *ks = SDL_GetKeyboardState(NULL);
+
+	if (menu_flag) {
+		menu_flag = false;
+		return true;
+	}
+	return ks[SDL_SCANCODE_ESCAPE] ||
+	       (ks[SDL_SCANCODE_Q] && ks[SDL_SCANCODE_W]);
+}
+#else
+static bool menu_requested(void)
+{
+	return false;
+}
+#endif
+
 int retro_frontend_run(void)
 {
 	struct retro_system_info si;
@@ -296,15 +328,21 @@ int retro_frontend_run(void)
 		    frames_run >= CONFIG_RETRO_LLEXT_CYCLE_TEST) {
 			break;
 		}
+		if (menu_requested()) {
+			printf("[retro] return-to-menu requested\n");
+			break;
+		}
 
 		k_timer_status_sync(&frame_timer);
 	}
 
-	/* Cycle-test path: full teardown, then the caller relaunches
-	 * and the next bind reloads the core from scratch.
+	/* Loop broke (cycle test / return-to-menu): full teardown, then
+	 * the caller relaunches and the next bind reloads a core from
+	 * scratch. In single-core forever mode the loop never breaks and
+	 * this is unreached.
 	 */
 	k_timer_stop(&frame_timer);
-	printf("[retro] cycle: ran %u frames, unloading core\n", frames_run);
+	printf("[retro] unloading core (ran %u frames)\n", frames_run);
 	core.unload_game();
 	core.deinit();
 	retro_core_unbind();

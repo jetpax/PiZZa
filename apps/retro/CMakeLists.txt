@@ -64,6 +64,32 @@ else()
   list(APPEND RETRO_SRC src/retro_core_llext.c src/retro_llext_exports.c)
 endif()
 
+# Shared FATFS mount (menu scan + llext loader share one volume).
+if(CONFIG_RETRO_CORE_LLEXT_FS)
+  list(APPEND RETRO_SRC src/retro_storage.c)
+endif()
+
+# Launcher menu (M4): core picker + in-process swap.
+if(CONFIG_RETRO_MENU)
+  list(APPEND RETRO_SRC src/retro_menu.c)
+endif()
+
+# qemu-only: seed the ram-disk with cores embedded in the image, so the
+# launcher's fs scan + swap can be exercised in sim (RETRO_CORE_LLEXT =
+# 2048.llext, RETRO_CORE_LLEXT2 = a second core, both built for qemu).
+if(CONFIG_RETRO_QEMU_RAMDISK_SEED)
+  if(NOT DEFINED ENV{RETRO_CORE_LLEXT} OR NOT DEFINED ENV{RETRO_CORE_LLEXT2})
+    message(FATAL_ERROR
+      "retro: RAMDISK_SEED needs RETRO_CORE_LLEXT + RETRO_CORE_LLEXT2 envs")
+  endif()
+  list(APPEND RETRO_SRC src/retro_qemu_seed.c src/retro_qemu_seed_pack.S)
+  set_source_files_properties(src/retro_qemu_seed_pack.S PROPERTIES
+    OBJECT_DEPENDS "$ENV{RETRO_CORE_LLEXT};$ENV{RETRO_CORE_LLEXT2}"
+    COMPILE_DEFINITIONS
+      "SEED_CORE_A=\"$ENV{RETRO_CORE_LLEXT}\";SEED_CORE_B=\"$ENV{RETRO_CORE_LLEXT2}\""
+  )
+endif()
+
 if(CONFIG_RETRO_CORE_LLEXT_EMBED)
   if(NOT DEFINED ENV{RETRO_CORE_LLEXT})
     message(FATAL_ERROR

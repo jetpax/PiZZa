@@ -22,6 +22,7 @@
 #include <zephyr/llext/llext.h>
 #include <zephyr/llext/buf_loader.h>
 #include <zephyr/llext/fs_loader.h>
+#include <string.h>
 
 #include "retro_core.h"
 
@@ -30,30 +31,28 @@ LOG_MODULE_REGISTER(retro_core, CONFIG_RETRO_LOG_LEVEL);
 static struct llext *core_ext;
 
 #ifdef CONFIG_RETRO_CORE_LLEXT_FS
-#include <zephyr/fs/fs.h>
-#include <ff.h>
+#include "retro_storage.h"
 
-static FATFS fat_fs;
-static struct fs_mount_t sd_mount = {
-	.type = FS_FATFS,
-	.mnt_point = "/SD:",
-	.fs_data = &fat_fs,
-};
+/* The path to load. The launcher menu overrides it per selection via
+ * retro_core_set_path(); empty = the build-time default.
+ */
+static char fs_path[128];
 
-static int sd_mount_once(void)
+void retro_core_set_path(const char *path)
 {
-	int rc = fs_mount(&sd_mount);
-
-	/* btinput's bond store may already have mounted it. */
-	if (rc == 0 || rc == -EBUSY) {
-		return 0;
+	if (path != NULL) {
+		strncpy(fs_path, path, sizeof(fs_path) - 1);
+		fs_path[sizeof(fs_path) - 1] = '\0';
 	}
-	LOG_ERR("llext: /SD: mount failed (%d)", rc);
-	return rc;
 }
 #else
 extern const uint8_t retro_core_blob_start[];
 extern const uint8_t retro_core_blob_end[];
+
+void retro_core_set_path(const char *path)
+{
+	(void)path;
+}
 #endif
 
 static const void *find_sym_checked(const char *name, bool *ok)
@@ -73,16 +72,16 @@ int retro_core_bind(struct retro_core_api *api)
 	struct llext_load_param ldr_parm = LLEXT_LOAD_PARAM_DEFAULT;
 
 #ifdef CONFIG_RETRO_CORE_LLEXT_FS
-	rc = sd_mount_once();
+	rc = retro_storage_mount();
 	if (rc != 0) {
 		return rc;
 	}
 
-	struct llext_fs_loader fs_ldr =
-		LLEXT_FS_LOADER(CONFIG_RETRO_CORE_LLEXT_PATH);
+	const char *path = fs_path[0] ? fs_path : CONFIG_RETRO_CORE_LLEXT_PATH;
+	struct llext_fs_loader fs_ldr = LLEXT_FS_LOADER(path);
 	struct llext_loader *ldr = &fs_ldr.loader;
 
-	LOG_INF("llext: loading %s", CONFIG_RETRO_CORE_LLEXT_PATH);
+	LOG_INF("llext: loading %s", path);
 #else
 	size_t blob_len = retro_core_blob_end - retro_core_blob_start;
 	struct llext_buf_loader buf_ldr =
