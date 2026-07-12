@@ -1,0 +1,62 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * PiZZa libretro frontend overlay for rpi_zero_2w.
+ *
+ *   - &mbox0 + &firmware: VC mailbox + property tags (FB alloc).
+ *   - &vc_fb: HDMI framebuffer at the monitor's EDID-negotiated
+ *     scanout mode. The virtual FB is 384x464: the 2048 core's native
+ *     376x464 frame is CENTERED into it by retro_present_display.c
+ *     (384 * 4 = 1536 bytes/row, 64-byte aligned, so the FB driver's
+ *     contiguous-DMA fast path engages; 376 * 4 = 1504 is not). The
+ *     VideoCore HVS scales the virtual FB to the cable on the fly --
+ *     the proven Jet / wipeout / Doom / SDLPoP / sokoban trick.
+ *   - &dma: BCM2835 DMA for the backbuffer->fb blit.
+ *   - &usb + cdc_acm child: USB CDC ACM shell endpoint.
+ *   - mini-UART (uart1) console + LOG target, PiZZa convention.
+ */
+
+#include <zephyr/dt-bindings/display/panel.h>
+
+&mbox0 {
+	status = "okay";
+};
+
+&firmware {
+	status = "okay";
+};
+
+&dma {
+	status = "okay";
+};
+
+&vc_fb {
+	pixel-format = <PANEL_PIXEL_FORMAT_ARGB_8888>;
+	render-width = <384>;
+	render-height = <464>;
+	status = "okay";
+};
+
+&usb {
+	status = "okay";
+
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+		label = "PiZZa retro shell (USB CDC ACM)";
+	};
+};
+
+/ {
+	chosen {
+		zephyr,console = &uart1;
+		zephyr,shell-uart = &cdc_acm_uart0;
+		zephyr,display = &vc_fb;
+	};
+};
+
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_gpio14>;
+	status = "okay";
+	current-speed = <115200>;
+};

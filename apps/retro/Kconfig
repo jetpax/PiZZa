@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# PiZZa libretro frontend -- app options.
+
+# SAMPLE_USBD_* options for sample_usbd_init.c on boards with the USB
+# device stack.
+source "samples/subsys/usb/common/Kconfig.sample_usbd"
+
+# Shared shim: audio-backend choice + SDL2SHIM log module.
+rsource "../lib/sdl2shim/Kconfig"
+# BT HID input (pad/keyboard/mouse) -- enabled per-board (rpi_zero_2w).
+rsource "../lib/btinput/Kconfig"
+
+menu "PiZZa libretro frontend"
+
+choice RETRO_PRESENT_BACKEND
+	prompt "Frame present backend"
+	default RETRO_PRESENT_DISPLAY if DISPLAY
+	default RETRO_PRESENT_NONE
+
+config RETRO_PRESENT_DISPLAY
+	bool "Zephyr display API (bcm2835_fb + HVS scaling on hardware)"
+	depends on DISPLAY
+
+config RETRO_PRESENT_NONE
+	bool "Drop frames (link/sim bring-up)"
+
+config RETRO_PRESENT_SEMIHOST
+	bool "Semihosting PPM capture (qemu sim gates)"
+	depends on SEMIHOST
+
+endchoice
+
+config RETRO_CAPTURE_EVERY
+	int "Capture every Nth presented frame (0 = first frame only)"
+	depends on RETRO_PRESENT_SEMIHOST
+	default 0
+
+config RETRO_SCRIPTED_INPUT
+	bool "Drive the core from the scripted synthetic input timeline"
+	default n
+
+module = RETRO
+module-str = retro
+source "subsys/logging/Kconfig.template.log_config"
+
+endmenu
+
+source "Kconfig.zephyr"
