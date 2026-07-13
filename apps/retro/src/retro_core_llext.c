@@ -22,6 +22,10 @@
 #include <zephyr/llext/llext.h>
 #include <zephyr/llext/buf_loader.h>
 #include <zephyr/llext/fs_loader.h>
+#ifdef CONFIG_RETRO_CORE_LLEXT_FS
+#include <zephyr/fs/fs.h>
+#include <stdlib.h>
+#endif
 #include <string.h>
 
 #include "retro_core.h"
@@ -44,6 +48,55 @@ void retro_core_set_path(const char *path)
 		strncpy(fs_path, path, sizeof(fs_path) - 1);
 		fs_path[sizeof(fs_path) - 1] = '\0';
 	}
+}
+
+/* Read the whole .llext into a RAM buffer (caller frees). The fs loader
+ * seek+reads per section/symbol/relocation, and on the SD card each op
+ * pays FATFS + card latency -- ~1 minute for Doom's 1.1 MB core. One
+ * sequential slurp here, then a TEMPORARY buf loader over RAM, cuts that
+ * to a couple of seconds (the loader peeks RAM instead of hitting the
+ * card thousands of times).
+ */
+static void *slurp_llext(const char *path, size_t *out_len)
+{
+	struct fs_dirent st;
+	struct fs_file_t f;
+	uint8_t *buf;
+	size_t off = 0;
+
+	if (fs_stat(path, &st) != 0 || st.type != FS_DIR_ENTRY_FILE) {
+		LOG_ERR("llext: stat %s failed", path);
+		return NULL;
+	}
+	buf = malloc(st.size);
+	if (buf == NULL) {
+		LOG_ERR("llext: alloc %zu for %s failed", (size_t)st.size, path);
+		return NULL;
+	}
+	fs_file_t_init(&f);
+	if (fs_open(&f, path, FS_O_READ) != 0) {
+		LOG_ERR("llext: open %s failed", path);
+		free(buf);
+		return NULL;
+	}
+	while (off < (size_t)st.size) {
+		ssize_t rd = fs_read(&f, buf + off, (size_t)st.size - off);
+
+		if (rd <= 0) {
+			break;
+		}
+		off += (size_t)rd;
+	}
+	fs_close(&f);
+
+	if (off != (size_t)st.size) {
+		LOG_ERR("llext: short read %s (%zu/%zu)", path, off,
+			(size_t)st.size);
+		free(buf);
+		return NULL;
+	}
+	*out_len = (size_t)st.size;
+	return buf;
 }
 #else
 extern const uint8_t retro_core_blob_start[];
@@ -78,10 +131,18 @@ int retro_core_bind(struct retro_core_api *api)
 	}
 
 	const char *path = fs_path[0] ? fs_path : CONFIG_RETRO_CORE_LLEXT_PATH;
-	struct llext_fs_loader fs_ldr = LLEXT_FS_LOADER(path);
-	struct llext_loader *ldr = &fs_ldr.loader;
 
 	LOG_INF("llext: loading %s", path);
+
+	size_t blob_len = 0;
+	void *fs_buf = slurp_llext(path, &blob_len);
+
+	if (fs_buf == NULL) {
+		return -EIO;
+	}
+	struct llext_buf_loader buf_ldr =
+		LLEXT_TEMPORARY_BUF_LOADER(fs_buf, blob_len);
+	struct llext_loader *ldr = &buf_ldr.loader;
 #else
 	size_t blob_len = retro_core_blob_end - retro_core_blob_start;
 	struct llext_buf_loader buf_ldr =
@@ -92,6 +153,14 @@ int retro_core_bind(struct retro_core_api *api)
 #endif
 
 	rc = llext_load(ldr, "core", &core_ext, &ldr_parm);
+
+#ifdef CONFIG_RETRO_CORE_LLEXT_FS
+	/* TEMPORARY storage: llext has copied every region into its heap, so
+	 * nothing points back into the slurp buffer -- free it now.
+	 */
+	free(fs_buf);
+#endif
+
 	if (rc != 0) {
 		LOG_ERR("llext: load failed (%d)", rc);
 		core_ext = NULL;
