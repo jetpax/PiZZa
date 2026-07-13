@@ -20,6 +20,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/display.h>
+#include <zephyr/drivers/display/bcm2835_fb.h>
 #include <zephyr/logging/log.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,6 +31,7 @@ LOG_MODULE_REGISTER(retro_present, CONFIG_RETRO_LOG_LEVEL);
 
 static const struct device *display_dev;
 static uint32_t *backbuf;
+static size_t backbuf_px;
 static int disp_w;
 static int disp_h;
 static int core_w;
@@ -45,6 +47,15 @@ int s2s_present_init(int width, int height)
 		return -ENODEV;
 	}
 
+	/* Size the virtual framebuffer to this core so the VideoCore HVS
+	 * upscales it to fill the screen -- the same trick the standalone
+	 * app ports use. If the driver can't resize (non-bcm2835 display, VC
+	 * error) the FB keeps its boot geometry and the core is letterboxed
+	 * into it, centered, as before.
+	 */
+	(void)bcm2835_fb_set_render_size(display_dev, (uint16_t)width,
+					 (uint16_t)height);
+
 	struct display_capabilities caps;
 
 	display_get_capabilities(display_dev, &caps);
@@ -59,19 +70,26 @@ int s2s_present_init(int width, int height)
 		return -EINVAL;
 	}
 
-	/* Re-init across core load/unload cycles reuses the buffer
-	 * (display geometry is boot-constant).
+	/* Backbuffer tracks the current FB geometry; grow it across core
+	 * switches (a bigger core after a smaller one).
 	 */
-	if (!backbuf) {
-		backbuf = malloc((size_t)disp_w * disp_h * 4);
-	}
-	if (!backbuf) {
-		LOG_ERR("present: backbuffer alloc failed (%dx%d)",
-			disp_w, disp_h);
-		return -ENOMEM;
+	size_t need = (size_t)disp_w * disp_h;
+
+	if (backbuf_px < need) {
+		uint32_t *p = realloc(backbuf, need * 4);
+
+		if (!p) {
+			LOG_ERR("present: backbuffer alloc failed (%dx%d)",
+				disp_w, disp_h);
+			return -ENOMEM;
+		}
+		backbuf = p;
+		backbuf_px = need;
 	}
 
-	/* Opaque black margins. */
+	/* Opaque black margins (only visible when the FB couldn't be
+	 * resized to the core and the frame is letterboxed).
+	 */
 	for (int i = 0; i < disp_w * disp_h; i++) {
 		backbuf[i] = 0xFF000000u;
 	}
