@@ -20,3 +20,12 @@ seed_core_b_start:
 	.incbin SEED_CORE_B
 	.global seed_core_b_end
 seed_core_b_end:
+
+#ifdef SEED_WAD
+	.balign 8
+	.global seed_wad_start
+seed_wad_start:
+	.incbin SEED_WAD
+	.global seed_wad_end
+seed_wad_end:
+#endif

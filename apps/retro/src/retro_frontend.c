@@ -17,8 +17,12 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#ifdef CONFIG_FILE_SYSTEM
+#include <zephyr/fs/fs.h>
+#endif
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "sdl2shim.h"
@@ -33,6 +37,12 @@ static enum retro_pixel_format pixfmt = RETRO_PIXEL_FORMAT_0RGB1555;
 static struct retro_frame_time_callback frame_time_cb;
 static bool support_no_game;
 static bool present_ready;
+
+/* Split-lifecycle state (open -> run_loaded -> close). */
+static struct retro_content_req content_req;
+static bool core_open;    /* between open() and close() */
+static bool game_loaded;  /* load_game() succeeded -> unload_game() owed */
+static void *content_rom; /* RAM-loaded content, held until close() */
 
 /* llext heap watermark (cycle-test evidence: allocated must return to
  * baseline after every unbind).
@@ -107,18 +117,40 @@ static bool env_cb(unsigned int cmd, void *data)
 		enum retro_pixel_format fmt =
 			*(const enum retro_pixel_format *)data;
 
-		if (fmt != RETRO_PIXEL_FORMAT_XRGB8888) {
-			LOG_ERR("env: pixel format %d unsupported "
-				"(XRGB8888 only)", fmt);
+		switch (fmt) {
+		case RETRO_PIXEL_FORMAT_0RGB1555:
+		case RETRO_PIXEL_FORMAT_XRGB8888:
+		case RETRO_PIXEL_FORMAT_RGB565:
+			pixfmt = fmt;
+			LOG_INF("env: pixel format %d", fmt);
+			return true;
+		default:
+			LOG_ERR("env: pixel format %d unsupported", fmt);
 			return false;
 		}
-		pixfmt = fmt;
-		return true;
 	}
 
 	case RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME:
 		support_no_game = *(const bool *)data;
 		return true;
+
+#ifdef CONFIG_RETRO_STORAGE_MOUNT
+	/* Content-consuming cores read these in init and some NULL-deref on
+	 * a false return. Fixed dirs on the frontend's volume (created at
+	 * mount); the returned string must outlive the call, so a literal.
+	 */
+	case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
+		*(const char **)data = CONFIG_RETRO_STORAGE_MOUNT "/system";
+		return true;
+
+	case RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY:
+		*(const char **)data = CONFIG_RETRO_STORAGE_MOUNT "/saves";
+		return true;
+
+	case RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY:
+		*(const char **)data = CONFIG_RETRO_STORAGE_MOUNT "/system";
+		return true;
+#endif
 
 	case RETRO_ENVIRONMENT_SET_VARIABLES:
 	case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
@@ -152,13 +184,91 @@ static bool env_cb(unsigned int cmd, void *data)
 	}
 }
 
+/* The present seam (s2s_present_frame) and every other caller of it (menu,
+ * sdl2shim-over-libretro) speak 32bpp ARGB. A core, though, emits whichever
+ * format it selected via SET_PIXEL_FORMAT: XRGB8888 passes straight through
+ * (zero-copy, the 2048/sokoban path), while RGB565 and 0RGB1555 are expanded
+ * into a frontend-owned ARGB scratch first. Keeping this in the frontend --
+ * the one place that knows libretro pixel formats -- leaves the shared seam's
+ * contract untouched.
+ */
+static uint32_t *present_scratch;
+static size_t present_scratch_px;
+
+static uint32_t *scratch_for(unsigned int w, unsigned int h)
+{
+	size_t need = (size_t)w * h;
+
+	if (need > present_scratch_px) {
+		uint32_t *p = realloc(present_scratch, need * 4);
+
+		if (!p) {
+			LOG_ERR("present: scratch alloc (%ux%u) failed", w, h);
+			return NULL;
+		}
+		present_scratch = p;
+		present_scratch_px = need;
+	}
+	return present_scratch;
+}
+
+static void present_core_frame(const void *data, unsigned int w,
+			       unsigned int h, size_t pitch)
+{
+	if (pixfmt == RETRO_PIXEL_FORMAT_XRGB8888) {
+		s2s_present_frame(data, (int)pitch);
+		return;
+	}
+
+	uint32_t *dst = scratch_for(w, h);
+
+	if (!dst) {
+		return;
+	}
+
+	const uint8_t *src_row = data;
+
+	for (unsigned int y = 0; y < h; y++) {
+		const uint16_t *px = (const uint16_t *)src_row;
+		uint32_t *o = dst + (size_t)y * w;
+
+		if (pixfmt == RETRO_PIXEL_FORMAT_RGB565) {
+			for (unsigned int x = 0; x < w; x++) {
+				uint32_t p = px[x];
+				uint32_t r = (p >> 11) & 0x1F;
+				uint32_t g = (p >> 5) & 0x3F;
+				uint32_t b = p & 0x1F;
+
+				o[x] = 0xFF000000u |
+				       (((r << 3) | (r >> 2)) << 16) |
+				       (((g << 2) | (g >> 4)) << 8) |
+				       ((b << 3) | (b >> 2));
+			}
+		} else { /* RETRO_PIXEL_FORMAT_0RGB1555 */
+			for (unsigned int x = 0; x < w; x++) {
+				uint32_t p = px[x];
+				uint32_t r = (p >> 10) & 0x1F;
+				uint32_t g = (p >> 5) & 0x1F;
+				uint32_t b = p & 0x1F;
+
+				o[x] = 0xFF000000u |
+				       (((r << 3) | (r >> 2)) << 16) |
+				       (((g << 3) | (g >> 2)) << 8) |
+				       ((b << 3) | (b >> 2));
+			}
+		}
+		src_row += pitch;
+	}
+	s2s_present_frame(dst, (int)(w * 4));
+}
+
 static void video_cb(const void *data, unsigned int width,
 		     unsigned int height, size_t pitch)
 {
 	if (!data || !present_ready) {
 		return; /* NULL = frame dupe */
 	}
-	s2s_present_frame(data, (int)pitch);
+	present_core_frame(data, width, height, pitch);
 }
 
 static void audio_sample_cb(int16_t left, int16_t right)
@@ -245,11 +355,56 @@ static bool menu_requested(void)
 }
 #endif
 
-int retro_frontend_run(void)
+#ifdef CONFIG_FILE_SYSTEM
+/* Slurp a content file into a malloc'd buffer (need_fullpath == false
+ * cores take the bytes directly). Caller owns the buffer; the frontend
+ * holds it in content_rom until close() -- the libretro contract lets the
+ * frontend free after load_game(), but keeping it alive covers the cores
+ * that (against spec) retain the pointer, and GB/NES-class ROMs are small.
+ */
+static void *read_file(const char *path, size_t *out_sz)
+{
+	struct fs_dirent st;
+	struct fs_file_t f;
+	void *buf;
+	ssize_t rd;
+
+	if (fs_stat(path, &st) != 0 || st.type != FS_DIR_ENTRY_FILE) {
+		printf("[retro] content stat failed: %s\n", path);
+		return NULL;
+	}
+
+	buf = malloc(st.size);
+	if (!buf) {
+		printf("[retro] content alloc %zu failed\n", (size_t)st.size);
+		return NULL;
+	}
+
+	fs_file_t_init(&f);
+	if (fs_open(&f, path, FS_O_READ) != 0) {
+		printf("[retro] content open failed: %s\n", path);
+		free(buf);
+		return NULL;
+	}
+
+	rd = fs_read(&f, buf, st.size);
+	fs_close(&f);
+
+	if (rd != (ssize_t)st.size) {
+		printf("[retro] content short read (%zd/%zu)\n",
+		       rd, (size_t)st.size);
+		free(buf);
+		return NULL;
+	}
+
+	*out_sz = (size_t)st.size;
+	return buf;
+}
+#endif /* CONFIG_FILE_SYSTEM */
+
+int retro_frontend_open(void)
 {
 	struct retro_system_info si;
-	struct retro_system_av_info av;
-	struct k_timer frame_timer;
 	int rc;
 
 	/* Fresh per-bind state (the frontend relaunches across core
@@ -259,6 +414,9 @@ int retro_frontend_run(void)
 	memset(&frame_time_cb, 0, sizeof(frame_time_cb));
 	support_no_game = false;
 	present_ready = false;
+	game_loaded = false;
+	content_rom = NULL;
+	memset(&content_req, 0, sizeof(content_req));
 
 	log_llext_heap("pre-bind");
 	rc = retro_core_bind(&core);
@@ -283,12 +441,62 @@ int retro_frontend_run(void)
 	       si.library_version ? si.library_version : "?",
 	       (int)support_no_game, core.api_version());
 
-	if (!core.load_game(NULL)) {
-		printf("[retro] retro_load_game(NULL) failed\n");
-		core.deinit();
-		retro_core_unbind();
+	/* si.library_name / si.valid_extensions are pointers into the core's
+	 * rodata, valid until unbind -- safe to hold in content_req until
+	 * close().
+	 */
+	content_req.wants_content = !support_no_game;
+	content_req.need_fullpath = si.need_fullpath;
+	content_req.valid_extensions = si.valid_extensions;
+	content_req.library_name = si.library_name;
+
+	core_open = true;
+	return 0;
+}
+
+const struct retro_content_req *retro_frontend_content_req(void)
+{
+	return &content_req;
+}
+
+int retro_frontend_run_loaded(const char *content_path)
+{
+	struct retro_system_av_info av;
+	struct k_timer frame_timer;
+	struct retro_game_info info;
+	const struct retro_game_info *infop = NULL;
+
+	memset(&info, 0, sizeof(info)); /* also silences unused-var when NULL */
+
+	if (content_path && content_path[0]) {
+#ifdef CONFIG_FILE_SYSTEM
+		info.path = content_path;
+
+		if (!content_req.need_fullpath) {
+			size_t sz = 0;
+
+			content_rom = read_file(content_path, &sz);
+			if (!content_rom) {
+				return -1;
+			}
+			info.data = content_rom;
+			info.size = sz;
+		}
+		infop = &info;
+		printf("[retro] content: %s (%s, %zu bytes)\n", content_path,
+		       content_req.need_fullpath ? "path" : "data", info.size);
+#else
+		printf("[retro] content requested but no filesystem\n");
+		return -1;
+#endif
+	}
+
+	if (!core.load_game(infop)) {
+		printf("[retro] retro_load_game(%s) failed\n",
+		       infop ? "content" : "NULL");
 		return -1;
 	}
+	game_loaded = true;
 
 	core.get_system_av_info(&av);
 	printf("[retro] geometry %ux%u max %ux%u fps %d sample_rate %d\n",
@@ -336,16 +544,41 @@ int retro_frontend_run(void)
 		k_timer_status_sync(&frame_timer);
 	}
 
-	/* Loop broke (cycle test / return-to-menu): full teardown, then
-	 * the caller relaunches and the next bind reloads a core from
-	 * scratch. In single-core forever mode the loop never breaks and
-	 * this is unreached.
-	 */
 	k_timer_stop(&frame_timer);
-	printf("[retro] unloading core (ran %u frames)\n", frames_run);
-	core.unload_game();
+	printf("[retro] core ran %u frames\n", frames_run);
+	return 0;
+}
+
+void retro_frontend_close(void)
+{
+	if (!core_open) {
+		return;
+	}
+
+	if (game_loaded) {
+		core.unload_game();
+		game_loaded = false;
+	}
 	core.deinit();
 	retro_core_unbind();
+
+	if (content_rom) {
+		free(content_rom);
+		content_rom = NULL;
+	}
+	core_open = false;
 	log_llext_heap("post-unbind");
-	return 0;
+}
+
+int retro_frontend_run(void)
+{
+	int rc = retro_frontend_open();
+
+	if (rc != 0) {
+		return rc;
+	}
+
+	rc = retro_frontend_run_loaded(NULL);
+	retro_frontend_close();
+	return rc;
 }

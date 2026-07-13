@@ -16,4 +16,12 @@
  */
 int retro_menu_run(char *out_path, size_t out_sz);
 
+/* Browse RETRO_CONTENT_DIR filtered by the chosen core's valid_extensions
+ * (pipe list, e.g. "gb|gbc"). title heads the screen (the core name).
+ * Returns 0 with out_path filled on a pick, -1 if the user backs out with
+ * Home. Blocks on an empty dir (rescanning) until a pick or a back.
+ */
+int retro_menu_browse_content(const char *title, const char *exts,
+			      char *out_path, size_t out_sz);
+
 #endif /* PIZZA_RETRO_MENU_H */

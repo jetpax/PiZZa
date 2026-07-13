@@ -14,10 +14,15 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/llext/symbol.h>
+#ifdef CONFIG_FILE_SYSTEM
+#include <zephyr/fs/fs.h>
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
+#include <ctype.h>
 #include <math.h>
 #include <time.h>
 
@@ -125,3 +130,64 @@ EXPORT_SYMBOL(filestream_tell);
 EXPORT_SYMBOL(filestream_vfs_init);
 EXPORT_SYMBOL(fill_pathname_join);
 EXPORT_SYMBOL(path_is_valid);
+
+/* ── M5 content cores: the fs surface a core's stdio layer binds to ──
+ * A need_fullpath core (fstest, Doom) defines its own fopen/fread/...
+ * over these (Approach 2: an imported picolibc fopen would funnel to
+ * the frontend's open(), never the core's -- so the core owns stdio and
+ * calls straight through to fs_*). Exporting fs_seek/fs_tell also
+ * anchors them into the image (the frontend itself only reads
+ * sequentially).
+ */
+#ifdef CONFIG_FILE_SYSTEM
+EXPORT_SYMBOL(fs_open);
+EXPORT_SYMBOL(fs_close);
+EXPORT_SYMBOL(fs_read);
+EXPORT_SYMBOL(fs_write);
+EXPORT_SYMBOL(fs_seek);
+EXPORT_SYMBOL(fs_tell);
+EXPORT_SYMBOL(fs_stat);
+EXPORT_SYMBOL(fs_mkdir);
+EXPORT_SYMBOL(fs_unlink);
+#endif
+
+/* ── Doom core additions (sdl2-doom engine libc surface) ──────────
+ * The empirical set doom.llext imports that the frontend image does not
+ * otherwise pull in (nm -u doom.llext minus the image's defined globals;
+ * the rest -- memmove/realloc/strchr/strncpy/exit/vfprintf... -- are
+ * already linked and resolve via LLEXT_IMPORT_ALL_GLOBALS). These are
+ * exported for the game's config/DEH/string paths; the WAD read path
+ * itself binds to the core's own fs-backed stdio (doom_core_fs.c).
+ */
+extern const char _ctype_b[]; /* picolibc ctype table (isX inlines) */
+/* POSIX, not exposed by the default picolibc feature set here. */
+extern char *strdup(const char *s);
+extern int putenv(char *string);
+EXPORT_SYMBOL(_ctype_b);
+EXPORT_SYMBOL(atexit);
+EXPORT_SYMBOL(atof);
+EXPORT_SYMBOL(putenv);
+EXPORT_SYMBOL(remove);
+EXPORT_SYMBOL(fflush);
+EXPORT_SYMBOL(fgets);
+EXPORT_SYMBOL(fputc);
+EXPORT_SYMBOL(putchar);
+EXPORT_SYMBOL(sscanf);
+EXPORT_SYMBOL(vfprintf);
+EXPORT_SYMBOL(strcasecmp);
+EXPORT_SYMBOL(strncasecmp);
+EXPORT_SYMBOL(strdup);
+EXPORT_SYMBOL(strstr);
+EXPORT_SYMBOL(tolower);
+EXPORT_SYMBOL(toupper);
+/* Libc the frontend doesn't itself reference (so absent from the image
+ * and unreachable via IMPORT_ALL_GLOBALS); EXPORT_SYMBOL anchors them.
+ * exit/strchr the frontend never calls; realloc/strrchr/strncpy/memmove
+ * it does, but export them too so the set is explicit and load-proof.
+ */
+EXPORT_SYMBOL(exit);
+EXPORT_SYMBOL(realloc);
+EXPORT_SYMBOL(memmove);
+EXPORT_SYMBOL(strchr);
+EXPORT_SYMBOL(strrchr);
+EXPORT_SYMBOL(strncpy);

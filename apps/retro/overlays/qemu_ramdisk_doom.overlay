@@ -1,0 +1,16 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Larger RAM-backed FAT disk for the M5 Doom content gate: doom1.wad is
+ * ~4 MB, well over the 2 MB M4 ram-disk. 16000 sectors x 512 = 8 MB
+ * holds doom1.wad + doom.llext (~1.1 MB) + 2048.llext + FAT overhead.
+ */
+
+/ {
+	ramdisk0 {
+		compatible = "zephyr,ram-disk";
+		disk-name = "RAM";
+		sector-size = <512>;
+		sector-count = <16000>;
+	};
+};

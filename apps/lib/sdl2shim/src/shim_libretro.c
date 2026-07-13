@@ -88,6 +88,12 @@ static bool app_started;
 static bool has_bitmask;
 static uint16_t pad_prev;
 
+/* Content path handed to the wrapped app on its command line (M5). Empty
+ * for a no_game core. Captured in retro_load_game, consumed by the game
+ * thread's argv.
+ */
+static char content_path[256];
+
 /* ── present seam (the glue IS the core's present backend) ────── */
 
 int s2s_present_init(int width, int height)
@@ -122,14 +128,28 @@ void s2s_present_frame(const void *pixels, int pitch)
 
 static void app_thread_main(void *a, void *b, void *c)
 {
-	static char *argv[] = { (char *)"core", NULL };
+	/* argv: "core" [content_arg] [content_path]. A no_game core runs
+	 * with just "core"; a content core appends its flag (Doom: -iwad)
+	 * and the picked file, so the game opens exactly that path.
+	 */
+	char *argv[4];
+	int argc = 0;
 
 	ARG_UNUSED(a);
 	ARG_UNUSED(b);
 	ARG_UNUSED(c);
 
+	argv[argc++] = (char *)"core";
+	if (content_path[0] != '\0') {
+		if (s2s_libretro_desc.content_arg != NULL) {
+			argv[argc++] = (char *)s2s_libretro_desc.content_arg;
+		}
+		argv[argc++] = content_path;
+	}
+	argv[argc] = NULL;
+
 	while (!app_stop) {
-		SDL_main(1, argv);
+		SDL_main(argc, argv);
 		/* Appliance semantics: the game quitting relaunches it
 		 * (sokoban's ESC-to-title loop, Doom's demo cycle).
 		 */
@@ -194,7 +214,7 @@ static void input_sync(void)
 
 RETRO_API void retro_set_environment(retro_environment_t cb)
 {
-	bool no_game = true;
+	bool no_game = !s2s_libretro_desc.needs_content;
 
 	env_cb = cb;
 	env_cb(RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME, &no_game);
@@ -251,8 +271,8 @@ RETRO_API void retro_get_system_info(struct retro_system_info *info)
 	memset(info, 0, sizeof(*info));
 	info->library_name = s2s_libretro_desc.name;
 	info->library_version = s2s_libretro_desc.version;
-	info->need_fullpath = false;
-	info->valid_extensions = NULL;
+	info->need_fullpath = s2s_libretro_desc.need_fullpath;
+	info->valid_extensions = s2s_libretro_desc.valid_extensions;
 }
 
 RETRO_API void retro_get_system_av_info(struct retro_system_av_info *info)
@@ -309,7 +329,14 @@ RETRO_API bool retro_load_game(const struct retro_game_info *info)
 {
 	enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_XRGB8888;
 
-	(void)info;
+	/* Capture the picked content path for the game thread's argv. A
+	 * no_game core gets info == NULL (or no path) -> empty. */
+	if (info != NULL && info->path != NULL) {
+		strncpy(content_path, info->path, sizeof(content_path) - 1);
+		content_path[sizeof(content_path) - 1] = '\0';
+	} else {
+		content_path[0] = '\0';
+	}
 
 	if (!env_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt)) {
 		printf("[s2s-lr] frontend refused XRGB8888\n");

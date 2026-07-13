@@ -83,10 +83,30 @@ if(CONFIG_RETRO_QEMU_RAMDISK_SEED)
       "retro: RAMDISK_SEED needs RETRO_CORE_LLEXT + RETRO_CORE_LLEXT2 envs")
   endif()
   list(APPEND RETRO_SRC src/retro_qemu_seed.c src/retro_qemu_seed_pack.S)
+  set(_seed_pack_defs "SEED_CORE_A=\"$ENV{RETRO_CORE_LLEXT}\";SEED_CORE_B=\"$ENV{RETRO_CORE_LLEXT2}\"")
+  set(_seed_pack_deps "$ENV{RETRO_CORE_LLEXT};$ENV{RETRO_CORE_LLEXT2}")
+
+  # Seed each core under its real llext basename (the menu lists by
+  # filename), so a content core sorts to a known slot.
+  get_filename_component(_seed_a_name "$ENV{RETRO_CORE_LLEXT}" NAME)
+  get_filename_component(_seed_b_name "$ENV{RETRO_CORE_LLEXT2}" NAME)
+  set(_seed_c_defs "SEED_CORE_A_NAME=\"${_seed_a_name}\";SEED_CORE_B_NAME=\"${_seed_b_name}\"")
+
+  # Optional content-core gate: RETRO_SEED_WAD names a WAD to bake into
+  # the image and drop into RETRO_CONTENT_DIR, so the browse -> pick ->
+  # load path runs in sim (fstest / Doom).
+  if(DEFINED ENV{RETRO_SEED_WAD})
+    get_filename_component(_seed_wad_name "$ENV{RETRO_SEED_WAD}" NAME)
+    string(APPEND _seed_pack_defs ";SEED_WAD=\"$ENV{RETRO_SEED_WAD}\"")
+    string(APPEND _seed_pack_deps ";$ENV{RETRO_SEED_WAD}")
+    string(APPEND _seed_c_defs ";RETRO_HAVE_SEED_WAD;RETRO_SEED_WAD_NAME=\"${_seed_wad_name}\"")
+  endif()
+
+  set_source_files_properties(src/retro_qemu_seed.c PROPERTIES
+    COMPILE_DEFINITIONS "${_seed_c_defs}")
   set_source_files_properties(src/retro_qemu_seed_pack.S PROPERTIES
-    OBJECT_DEPENDS "$ENV{RETRO_CORE_LLEXT};$ENV{RETRO_CORE_LLEXT2}"
-    COMPILE_DEFINITIONS
-      "SEED_CORE_A=\"$ENV{RETRO_CORE_LLEXT}\";SEED_CORE_B=\"$ENV{RETRO_CORE_LLEXT2}\""
+    OBJECT_DEPENDS "${_seed_pack_deps}"
+    COMPILE_DEFINITIONS "${_seed_pack_defs}"
   )
 endif()
 

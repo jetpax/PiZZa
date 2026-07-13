@@ -39,7 +39,31 @@ static void press(SDL_Scancode sc, int hold_ms)
 	submit_key(sc, SDL_KEYUP);
 }
 
-#ifdef CONFIG_RETRO_MENU
+#if defined(CONFIG_RETRO_SCRIPTED_CONTENT)
+/* M5 content-core gate: the seeded content core is written first, so it
+ * is menu entry 0. Launch it, then pick content entry 0 (the one seeded
+ * WAD) in the browser, then hold while it reads the file off the fs and
+ * renders. Exercises browse -> retro_game_info.path -> the core's
+ * fopen/fread over exported fs_*.
+ */
+static void script_main(void *a, void *b, void *c)
+{
+	ARG_UNUSED(a);
+	ARG_UNUSED(b);
+	ARG_UNUSED(c);
+
+	k_msleep(3000);
+	printf("[retro] scripted(content): launch core 0\n");
+	press(SDL_SCANCODE_X, 150); /* A = launch highlighted (entry 0) */
+
+	k_msleep(2500);
+	printf("[retro] scripted(content): pick content 0\n");
+	press(SDL_SCANCODE_X, 150); /* A = load the highlighted WAD */
+
+	k_msleep(20000); /* let the core read + render its verdict frames */
+	printf("[retro] scripted(content): timeline done\n");
+}
+#elif defined(CONFIG_RETRO_MENU)
 /* The L+R return-to-menu chord: both shoulders (Q/W in the frontend
  * map) held together.
  */

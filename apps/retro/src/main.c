@@ -25,7 +25,7 @@ void retro_btinput_start(void);
 
 int main(void)
 {
-	printf("[retro] PiZZa libretro frontend, board %s\n", CONFIG_BOARD);
+	printf("[retro] RetroPiZZa launcher, board %s\n", CONFIG_BOARD);
 
 #ifdef CONFIG_RETRO_QEMU_RAMDISK_SEED
 	retro_qemu_seed();
@@ -40,19 +40,42 @@ int main(void)
 #endif
 
 #ifdef CONFIG_RETRO_MENU
-	/* Launcher: pick a core, run it until the user asks for the menu
-	 * (L+R chord / `retro menu`), then reload the picker. A bind/load
-	 * failure falls straight back to the menu.
+	/* Launcher: pick a core; open it (bind + init) so its content needs
+	 * are known; browse content if it needs any; run until the user asks
+	 * for the menu (Home / L+R / `retro menu`); tear down; repeat. A
+	 * bind/load failure or a content-selection back-out returns to the
+	 * picker.
 	 */
 	for (;;) {
-		static char path[128];
+		static char core_path[128];
+		static char content_path[128];
 
-		if (retro_menu_run(path, sizeof(path)) == 0) {
-			retro_core_set_path(path);
-			retro_frontend_run();
-		} else {
+		if (retro_menu_run(core_path, sizeof(core_path)) != 0) {
 			k_msleep(1000);
+			continue;
 		}
+		retro_core_set_path(core_path);
+
+		if (retro_frontend_open() != 0) {
+			continue;
+		}
+
+		const struct retro_content_req *req =
+			retro_frontend_content_req();
+
+		content_path[0] = '\0';
+		if (req->wants_content) {
+			if (retro_menu_browse_content(req->library_name,
+						      req->valid_extensions,
+						      content_path,
+						      sizeof(content_path)) != 0) {
+				retro_frontend_close();
+				continue;
+			}
+		}
+
+		retro_frontend_run_loaded(content_path[0] ? content_path : NULL);
+		retro_frontend_close();
 	}
 #else
 	/* Single-core appliance: run forever; only a load failure returns

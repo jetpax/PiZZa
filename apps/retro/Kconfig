@@ -56,6 +56,15 @@ config RETRO_MENU_DIR
 	depends on RETRO_MENU
 	default "/SD:/cores"
 
+config RETRO_CONTENT_DIR
+	string "Directory scanned for content (ROMs/WADs)"
+	depends on RETRO_MENU
+	default "/SD:/roms"
+	help
+	  After picking a core that requires content, the launcher browses
+	  this directory filtered by the core's valid_extensions. Created
+	  at mount by retro_storage.c.
+
 config RETRO_MENU_WIDTH
 	int "Launcher render width (match the board's virtual FB)"
 	depends on RETRO_MENU
@@ -111,6 +120,16 @@ config RETRO_CAPTURE_EVERY
 config RETRO_SCRIPTED_INPUT
 	bool "Drive the core from the scripted synthetic input timeline"
 	default n
+
+config RETRO_SCRIPTED_CONTENT
+	bool "Scripted timeline for the content-core gate (launch + pick WAD)"
+	depends on RETRO_SCRIPTED_INPUT && RETRO_MENU
+	default n
+	help
+	  M5 sim gate: instead of the two-core swap timeline, launch menu
+	  entry 0 (the seeded content core), pick content entry 0 in the
+	  browser, and hold while the core reads the file off the fs. Used
+	  with overlays/qemu_content.conf.
 
 module = RETRO
 module-str = retro

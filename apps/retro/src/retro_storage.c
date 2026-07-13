@@ -25,6 +25,29 @@ static struct fs_mount_t mp = {
 	.mnt_point = CONFIG_RETRO_STORAGE_MOUNT,
 };
 
+/* The standard content layout the frontend + cores expect on the volume.
+ * roms = content browsed by the launcher; system/saves = the directory
+ * env commands; states = save-state slots. Created idempotently on mount
+ * (-EEXIST on a card that already has them is fine).
+ */
+static const char *const std_dirs[] = {
+	CONFIG_RETRO_STORAGE_MOUNT "/roms",
+	CONFIG_RETRO_STORAGE_MOUNT "/system",
+	CONFIG_RETRO_STORAGE_MOUNT "/saves",
+	CONFIG_RETRO_STORAGE_MOUNT "/states",
+};
+
+static void make_std_dirs(void)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(std_dirs); i++) {
+		int rc = fs_mkdir(std_dirs[i]);
+
+		if (rc != 0 && rc != -EEXIST) {
+			LOG_WRN("mkdir %s failed (%d)", std_dirs[i], rc);
+		}
+	}
+}
+
 int retro_storage_mount(void)
 {
 	static bool mounted;
@@ -40,12 +63,14 @@ int retro_storage_mount(void)
 	 */
 	if (fs_statvfs(CONFIG_RETRO_STORAGE_MOUNT, &st) == 0) {
 		mounted = true;
+		make_std_dirs();
 		return 0;
 	}
 
 	rc = fs_mount(&mp);
 	if (rc == 0 || rc == -EBUSY) {
 		mounted = true;
+		make_std_dirs();
 		return 0;
 	}
 
