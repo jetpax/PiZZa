@@ -320,6 +320,7 @@ RETRO_API void retro_run(void)
 			 s2s_libretro_desc.height, 0);
 	}
 
+	/* Legacy path only: no-op while the producer thread runs. */
 	if (audio_batch_cb) {
 		s2s_audio_lr_pump(audio_batch_cb, s2s_libretro_desc.fps);
 	}
@@ -349,6 +350,13 @@ RETRO_API bool retro_load_game(const struct retro_game_info *info)
 			K_PRIO_PREEMPT(8), 0, K_NO_WAIT);
 	k_thread_name_set(&app_thread, "lr_game");
 	app_started = true;
+
+	/* Audio-first production: the producer preempts the game, so a
+	 * frame running over budget slows the GAME, never the audio.
+	 */
+	if (audio_batch_cb) {
+		s2s_audio_lr_producer_start(audio_batch_cb);
+	}
 	return true;
 }
 
@@ -364,6 +372,11 @@ RETRO_API bool retro_load_game_special(unsigned int type,
 
 RETRO_API void retro_unload_game(void)
 {
+	/* Producer first: its code lives in this llext, so it must be dead
+	 * before the frontend can unload us.
+	 */
+	s2s_audio_lr_producer_stop();
+
 	if (!app_started) {
 		return;
 	}

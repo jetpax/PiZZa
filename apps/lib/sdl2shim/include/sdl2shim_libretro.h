@@ -56,9 +56,19 @@ extern const struct s2s_libretro_desc s2s_libretro_desc;
 /* Audio pump: called by the glue once per retro_run; pulls one video
  * frame's worth of samples from the game's SDL audio callback and
  * hands them to the frontend. Implemented in shim_audio_libretro.c.
+ * No-op while the producer thread (below) is running.
  */
 size_t s2s_audio_lr_pump(size_t (*batch)(const int16_t *, size_t),
 			 double fps);
+
+/* Audio producer thread (M6.6): mixes the game's callback in small
+ * chunks on a dedicated donated thread ABOVE the game's priority and
+ * pushes them to the frontend's batch callback, paced by backpressure
+ * (the frontend accepts all-or-nothing; a rejected chunk is retried).
+ * Started by the glue at retro_load_game, stopped at retro_unload_game.
+ */
+void s2s_audio_lr_producer_start(size_t (*batch)(const int16_t *, size_t));
+void s2s_audio_lr_producer_stop(void);
 
 #ifdef __cplusplus
 }
