@@ -7,4 +7,16 @@
 
 rsource "../../lib/sdl2shim/Kconfig"
 
+config DOOM_MUSIC_OPL
+	bool "OPL2/OPL3 FM music (Chocolate Doom synth via GENMIDI)"
+	default n
+	help
+	  Compile Chocolate Doom's OPL subsystem into the core (Nuked OPL3
+	  emulator + i_oplmusic sequencer, referenced from CHOCOLATE_SRC_DIR)
+	  and fold the synth into the shared mixer as a MIX_CHANNEL_POST
+	  effect -- the same seam SFX already uses. Instruments come from the
+	  WAD's GENMIDI lump; no external data. Mirrors the app build's
+	  CONFIG_DOOM_MUSIC_OPL. The MUS->MIDI temp round-trip is RAM-backed
+	  in doom_core_fs.c.
+
 source "Kconfig.zephyr"

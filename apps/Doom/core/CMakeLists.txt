@@ -80,6 +80,53 @@ add_custom_command(
 )
 list(APPEND DOOM_GAME_SRC ${DOOM_IVIDEO_GEN})
 
+# ── OPL music (CONFIG_DOOM_MUSIC_OPL) ───────────────────────────────
+# Mirror the app build (apps/Doom/CMakeLists.txt). The fork hardcodes
+# music_sdl_module (stubbed silent in shim_mixer.c); swap it to
+# music_opl_module via a pristine-checkout sed (same discipline as the
+# i_video rewrite), and pull Chocolate Doom's OPL synth + opl_glue.c into
+# the llext. The synth folds into the shared mixer as a MIX_CHANNEL_POST
+# effect -- the seam SFX already proves. The MUS->MIDI temp round-trip is
+# RAM-backed in doom_core_fs.c (the core's fs is the real SD card).
+set(DOOM_OPL_SRC "")
+set(DOOM_OPL_GLUE "")
+set(DOOM_OPL_INC "")
+if(CONFIG_DOOM_MUSIC_OPL)
+  list(REMOVE_ITEM DOOM_GAME_SRC ${DOOM_SRC_DIR}/i_sound.c)
+  set(DOOM_ISOUND_GEN ${CMAKE_BINARY_DIR}/gen/i_sound_opl.c)
+  add_custom_command(
+    OUTPUT ${DOOM_ISOUND_GEN}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/gen
+    COMMAND ${CMAKE_COMMAND} -E copy ${DOOM_SRC_DIR}/i_sound.c ${DOOM_ISOUND_GEN}
+    COMMAND sed -i.bak
+            -e "s|music_module = &music_sdl_module|music_module = \\&music_opl_module|"
+            ${DOOM_ISOUND_GEN}
+    DEPENDS ${DOOM_SRC_DIR}/i_sound.c
+    COMMENT "Selecting OPL music module (music_sdl -> music_opl)"
+    VERBATIM
+  )
+  list(APPEND DOOM_GAME_SRC ${DOOM_ISOUND_GEN})
+
+  if(NOT DEFINED CHOCOLATE_SRC_DIR)
+    set(CHOCOLATE_SRC_DIR "$ENV{HOME}/github/chocolate-doom")
+  endif()
+  if(NOT EXISTS "${CHOCOLATE_SRC_DIR}/opl/opl3.c")
+    message(FATAL_ERROR
+      "OPL music needs chocolate-doom at ${CHOCOLATE_SRC_DIR} "
+      "(opl/ + src/i_oplmusic.c). Pass -DCHOCOLATE_SRC_DIR=<path>.")
+  endif()
+  set(DOOM_OPL_SRC
+    ${CHOCOLATE_SRC_DIR}/opl/opl.c
+    ${CHOCOLATE_SRC_DIR}/opl/opl3.c
+    ${CHOCOLATE_SRC_DIR}/opl/opl_queue.c
+    ${CHOCOLATE_SRC_DIR}/opl/opl_sdl.c
+    ${CHOCOLATE_SRC_DIR}/src/midifile.c
+    ${CHOCOLATE_SRC_DIR}/src/i_oplmusic.c
+  )
+  set(DOOM_OPL_GLUE ${DOOM_DIR}/src/opl_glue.c)
+  set(DOOM_OPL_INC ${CHOCOLATE_SRC_DIR}/opl ${CHOCOLATE_SRC_DIR}/src)
+endif()
+
 # ── shim ────────────────────────────────────────────────────────────
 include(${DOOM_DIR}/../lib/sdl2shim/sdl2shim.cmake)
 
@@ -93,6 +140,8 @@ add_llext_target(doom_core
 	  src/doom_retro_desc.c
 	  ${SDL2SHIM_CORE_SOURCES}
 	  ${SDL2SHIM_LIBRETRO_SOURCES}
+	  ${DOOM_OPL_SRC}
+	  ${DOOM_OPL_GLUE}
 )
 
 llext_include_directories(doom_core
@@ -101,6 +150,7 @@ llext_include_directories(doom_core
 	${DOOM_DIR}/src
 	${DOOM_SRC_DIR}/../include
 	${DOOM_SRC_DIR}
+	${DOOM_OPL_INC}
 )
 
 llext_compile_options(doom_core
@@ -129,5 +179,12 @@ set_source_files_properties(${DOOM_GAME_SRC} PROPERTIES COMPILE_OPTIONS
 # SDL_main entry is this TU's main.
 set_source_files_properties(${DOOM_SRC_DIR}/i_main.c PROPERTIES
   COMPILE_DEFINITIONS "main=SDL_main")
+
+# Chocolate OPL TUs need the glibc-ism relief the game TUs get. opl_glue.c
+# is ours (Zephyr-native) and rides the core-wide llext options instead.
+if(CONFIG_DOOM_MUSIC_OPL)
+  set(OPL_FLAGS "-Wno-unused-variable;-Wno-unused-but-set-variable;-Wno-unused-function;-Wno-missing-braces;-Wno-implicit-fallthrough;-Wno-format;-Wno-maybe-uninitialized;-Wno-int-conversion;-include;strings.h;-D_DEFAULT_SOURCE")
+  set_source_files_properties(${DOOM_OPL_SRC} PROPERTIES COMPILE_OPTIONS "${OPL_FLAGS}")
+endif()
 
 target_sources(app PRIVATE src/empty.c)
