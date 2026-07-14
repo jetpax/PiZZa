@@ -31,6 +31,7 @@
 #include "retro_core.h"
 #ifdef CONFIG_SDL2SHIM_AUDIO_HDMI
 #include "retro_audio.h"
+#include "retro_clock.h"
 #endif
 
 LOG_MODULE_REGISTER(retro, CONFIG_RETRO_LOG_LEVEL);
@@ -520,6 +521,16 @@ int retro_frontend_run_loaded(const char *content_path)
 	} else {
 		printf("[retro] present init failed -- running headless\n");
 	}
+
+#ifdef CONFIG_SDL2SHIM_AUDIO_HDMI
+	/* The per-core framebuffer re-allocation above goes through the VC
+	 * firmware, which can reset its clock policy and drop the ARM back
+	 * to the 600 MHz idle floor -- silently undoing the boot-time bump.
+	 * Re-assert it now that display state is settled (idempotent; the
+	 * printed cur->post/measured line doubles as verification).
+	 */
+	retro_bump_arm_clock();
+#endif
 
 	double fps = (av.timing.fps > 1.0) ? av.timing.fps : 60.0;
 	uint32_t period_us = (uint32_t)(1000000.0 / fps);
