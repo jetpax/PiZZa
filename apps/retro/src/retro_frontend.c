@@ -29,6 +29,9 @@
 #include <libretro.h>
 #include "retro_frontend.h"
 #include "retro_core.h"
+#ifdef CONFIG_SDL2SHIM_AUDIO_HDMI
+#include "retro_audio.h"
+#endif
 
 LOG_MODULE_REGISTER(retro, CONFIG_RETRO_LOG_LEVEL);
 
@@ -279,8 +282,15 @@ static void audio_sample_cb(int16_t left, int16_t right)
 
 static size_t audio_batch_cb(const int16_t *data, size_t frames)
 {
-	(void)data;
-	return frames; /* consumed (discarded) -- audio ring lands at M1 */
+#ifdef CONFIG_SDL2SHIM_AUDIO_HDMI
+	/* All-or-nothing accept; 0 = ring full, the glue producer's
+	 * backpressure signal (it retries the same chunk).
+	 */
+	return retro_audio_push(data, frames);
+#else
+	(void)data; /* no audio backend (qemu): consume and drop */
+	return frames;
+#endif
 }
 
 static void input_poll_cb(void)
@@ -541,6 +551,12 @@ int retro_frontend_run_loaded(const char *content_path)
 			break;
 		}
 
+		/* Plain frame-timer pacing. Audio no longer rides this loop:
+		 * the glue's producer thread mixes above the game's priority
+		 * and paces itself off the frontend ring's backpressure (the
+		 * MAI drain rate), so the audio clock is the DMA, not this
+		 * timer.
+		 */
 		k_timer_status_sync(&frame_timer);
 	}
 

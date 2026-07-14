@@ -7,9 +7,15 @@ in-process — no reflash to change games. Cores are two kinds: wrapped
 PiZZa shim apps (Doom, sokoban) via the `sdl2shim`-over-libretro glue, and
 upstream libretro cores (2048, and the door M2 opened). Video is the
 core's native frame scaled to the monitor by the VideoCore HVS (per-core
-framebuffer sizing); input is a paired Bluetooth pad via
+framebuffer sizing); audio (SFX + OPL FM music) goes out the HDMI via the
+VC4 MAI, produced on a dedicated audio-first thread so it stays clean even
+when a core saturates the CPU; input is a paired Bluetooth pad via
 [`apps/lib/btinput`](../lib/btinput) or the `retro` USB CDC shell. Runs on
-the Raspberry Pi Zero 2 W.
+the Raspberry Pi Zero 2 W (audio needs `hdmi_drive=2` — already in the
+shipped `config.txt` — and a display that accepts HDMI audio).
+
+Master volume is global across cores: `CONFIG_RETRO_AUDIO_GAIN_PERCENT` at
+build time, `retro vol <0-200>` live on the shell.
 
 ## Prerequisites
 

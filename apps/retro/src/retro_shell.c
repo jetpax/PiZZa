@@ -108,6 +108,25 @@ static int cmd_retro_menu(const struct shell *sh, size_t argc, char **argv)
 }
 #endif
 
+#ifdef CONFIG_SDL2SHIM_AUDIO_HDMI
+#include "retro_audio.h"
+
+static int cmd_retro_vol(const struct shell *sh, size_t argc, char **argv)
+{
+	if (argc >= 2) {
+		int pct = atoi(argv[1]);
+
+		if (pct < 0 || pct > 200) {
+			shell_error(sh, "volume out of range (0..200)");
+			return -EINVAL;
+		}
+		retro_audio_set_volume((unsigned int)pct);
+	}
+	shell_print(sh, "volume %u%%", retro_audio_get_volume());
+	return 0;
+}
+#endif
+
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_retro,
 	SHELL_CMD_ARG(key, NULL,
 		      "inject a retropad press: retro key <name> [hold_ms]",
@@ -115,6 +134,10 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_retro,
 #ifdef CONFIG_RETRO_MENU
 	SHELL_CMD(menu, NULL, "tear down the running core, return to launcher",
 		  cmd_retro_menu),
+#endif
+#ifdef CONFIG_SDL2SHIM_AUDIO_HDMI
+	SHELL_CMD_ARG(vol, NULL, "master volume: retro vol [0-200]",
+		      cmd_retro_vol, 1, 1),
 #endif
 	SHELL_SUBCMD_SET_END);
 

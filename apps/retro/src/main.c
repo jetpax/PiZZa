@@ -10,6 +10,11 @@
 #include "sdl2shim.h"
 #include "retro_frontend.h"
 #include "retro_core.h"
+#include "retro_clock.h"
+
+#ifdef CONFIG_SDL2SHIM_AUDIO_HDMI
+#include "retro_audio.h"
+#endif
 
 #ifdef CONFIG_RETRO_MENU
 #include "retro_menu.h"
@@ -27,6 +32,8 @@ int main(void)
 {
 	printf("[retro] RetroPiZZa launcher, board %s\n", CONFIG_BOARD);
 
+	retro_bump_arm_clock();
+
 #ifdef CONFIG_RETRO_QEMU_RAMDISK_SEED
 	retro_qemu_seed();
 #endif
@@ -37,6 +44,14 @@ int main(void)
 
 #ifdef CONFIG_BTINPUT
 	retro_btinput_start();
+#endif
+
+#ifdef CONFIG_SDL2SHIM_AUDIO_HDMI
+	/* Open the HDMI-MAI audio path once; the feeder plays silence until a
+	 * core starts pushing samples through audio_batch_cb. Frontend runs
+	 * silent if the sink can't carry HDMI audio (init logs and returns <0).
+	 */
+	retro_audio_init();
 #endif
 
 #ifdef CONFIG_RETRO_MENU

@@ -91,6 +91,15 @@ EXPORT_SYMBOL(z_impl_k_sem_take);
 EXPORT_SYMBOL(z_impl_k_mutex_init);
 EXPORT_SYMBOL(z_impl_k_mutex_lock);
 EXPORT_SYMBOL(z_impl_k_mutex_unlock);
+/* Doom OPL music glue (opl_glue.c) wraps SDL cond vars over these. The
+ * OPL driver only uses mutexes at runtime (the cond path is Chocolate's
+ * hardware-detect delay, never taken here), but the symbols are still
+ * referenced by the compiled glue, so they must resolve at llext load.
+ * k_condvar has no TLS/name field, so its layout matches the core's.
+ */
+EXPORT_SYMBOL(z_impl_k_condvar_init);
+EXPORT_SYMBOL(z_impl_k_condvar_signal);
+EXPORT_SYMBOL(z_impl_k_condvar_wait);
 EXPORT_SYMBOL(z_impl_k_sleep);
 EXPORT_SYMBOL(z_impl_k_thread_create);
 EXPORT_SYMBOL(z_impl_k_thread_join);
@@ -119,6 +128,17 @@ EXPORT_SYMBOL(s2s_lr_app_thread);
 EXPORT_SYMBOL(s2s_lr_sem_run);
 EXPORT_SYMBOL(s2s_lr_sem_frame);
 EXPORT_SYMBOL(s2s_lr_audio_mutex);
+/* Audio producer thread (M6.6): the glue mixes the game's audio on this
+ * dedicated thread -- above the game in priority, so audio production
+ * preempts game compute instead of starving behind it -- and pushes to the
+ * frontend's batch callback. Donated for the same layout reasons as above.
+ */
+K_THREAD_STACK_DEFINE(s2s_lr_audio_stack, 16384);
+const size_t s2s_lr_audio_stack_size = K_THREAD_STACK_SIZEOF(s2s_lr_audio_stack);
+struct k_thread s2s_lr_audio_thread;
+EXPORT_SYMBOL(s2s_lr_audio_stack);
+EXPORT_SYMBOL(s2s_lr_audio_stack_size);
+EXPORT_SYMBOL(s2s_lr_audio_thread);
 
 /* frontend VFS stubs (retro_vfs_stubs.c) */
 EXPORT_SYMBOL(filestream_open);
@@ -191,3 +211,8 @@ EXPORT_SYMBOL(memmove);
 EXPORT_SYMBOL(strchr);
 EXPORT_SYMBOL(strrchr);
 EXPORT_SYMBOL(strncpy);
+/* OPL music (Chocolate opl.c / i_oplmusic.c) reads env overrides for the
+ * OPL I/O port and MIDI options; with no environment getenv returns NULL
+ * and the defaults apply. The frontend never calls getenv itself, so
+ * anchor it into the image. */
+EXPORT_SYMBOL(getenv);

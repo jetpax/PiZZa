@@ -84,6 +84,16 @@ config RETRO_QEMU_RAMDISK_SEED
 	  the formatted ram-disk at boot so the launcher's fs scan + swap
 	  exercises the exact HW path.
 
+config RETRO_AUDIO_GAIN_PERCENT
+	int "Master audio volume (percent of unity)"
+	depends on SDL2SHIM_AUDIO_HDMI
+	range 0 200
+	default 100
+	help
+	  RetroPiZZa-global master gain, applied to every core's mixed
+	  stream as it enters the audio bridge (values above 100 amplify
+	  with clamping). Runtime-adjustable with `retro vol <percent>`.
+
 config RETRO_LLEXT_CYCLE_TEST
 	int "Frames per bind cycle before unload/reload (0 = run forever)"
 	default 0

@@ -55,6 +55,7 @@ set(RETRO_SRC
   src/main.c
   src/retro_frontend.c
   src/retro_vfs_stubs.c
+  src/retro_clock.c
   ${SDL2SHIM_CORE_SOURCES}
 )
 
@@ -124,9 +125,11 @@ if(CONFIG_RETRO_CORE_LLEXT_EMBED)
 endif()
 
 # Audio backend (lib-owned). 2048 emits no audio; shim_stub.c still
-# delegates to the s2s_audio_* seam, so a backend TU must link.
+# delegates to the s2s_audio_* seam, so a backend TU must link. On HDMI
+# boards retro_audio.c bridges libretro's audio_batch_cb into the MAI
+# backend's pull-callback (SPSC ring); qemu keeps the silent none backend.
 if(CONFIG_SDL2SHIM_AUDIO_HDMI)
-  list(APPEND RETRO_SRC ${SDL2SHIM_AUDIO_HDMI_SOURCES})
+  list(APPEND RETRO_SRC ${SDL2SHIM_AUDIO_HDMI_SOURCES} src/retro_audio.c)
 else()
   list(APPEND RETRO_SRC ${SDL2SHIM_AUDIO_NONE})
 endif()

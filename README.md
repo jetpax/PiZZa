@@ -19,6 +19,9 @@ supported. Full Arduino walk-through, upload methods and library status:
 
 The [`apps/`](apps/) tree also carries the native ports that exercise the
 platform: Doom, Prince of Persia (SDLPoP), MAc and Dos emulators, 4-core wipEout and the Jet 3d.
+[RetroPiZZa](apps/retro/README.md) wraps them as a libretro launcher: pick
+a core on the TV, load it off the SD card, play with a Bluetooth pad —
+video scaled by the HVS, sound (SFX + FM music) out the HDMI.
 
 This is the user-facing distribution side of the
 **[jetpax/zephyr](https://github.com/jetpax/zephyr) fork**, which is
