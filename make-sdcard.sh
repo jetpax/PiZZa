@@ -17,12 +17,25 @@
 # no root, no privileged mode, works the same on macOS and Linux.
 #
 # Usage:
-#   ./make-sdcard.sh <rpi_zero_2w|rpi_zero_w> <zephyr.bin> [-o NAME.img]
-#                    [-s SIZE_MB] [payload files...]
+#   Single app:
+#     ./make-sdcard.sh <rpi_zero_2w|rpi_zero_w> <zephyr.bin> [-o NAME.img]
+#                      [-s SIZE_MB] [payload files...]
+#   Multi-app boot-menu card (WO-T1):
+#     ./make-sdcard.sh <board> --menu <bootmenu.bin> "Name=path/zephyr.bin"
+#                      [more "Name=path" entries] [-o ...] [-s ...] [payload...]
+#
+# Multi-app images stage PiZZaBoot as the config.txt default kernel, one
+# renamed kernel per entry (name slugged to <slug>.bin), a generated
+# menu.txt (first entry = the default, 5 s countdown), and the
+# [gpio17=0] force-menu conditional (button GPIO17 -> GND, held at
+# power-on). No chosen.txt is staged: first boot shows the menu.
 #
 # Examples:
 #   ./make-sdcard.sh rpi_zero_2w ~/zephyrproject/build/pizzashell/zephyr/zephyr.bin
 #   ./make-sdcard.sh rpi_zero_2w build/doom/zephyr/zephyr.bin -o pizza-doom.img doom.img
+#   ./make-sdcard.sh rpi_zero_2w --menu build-pizzaboot/zephyr/zephyr.bin \
+#       "PiZZa Shell=build-shell/zephyr/zephyr.bin" \
+#       "RetroPiZZa=build-retro-hw/zephyr/zephyr.bin" -o pizza-menu.img
 
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -31,9 +44,19 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # builds; same pin as apps/Arduino/loader-image).
 FW_PIN="afc8dbd74865c6d367dba5505c5a863252588ca8"
 
-BOARD="${1:?usage: $0 <rpi_zero_2w|rpi_zero_w> <zephyr.bin> [-o out.img] [-s size_mb] [payload...]}"
-ZEPHYR_BIN="${2:?path to zephyr.bin required}"
-shift 2
+BOARD="${1:?usage: $0 <rpi_zero_2w|rpi_zero_w> <zephyr.bin>|--menu <bootmenu.bin> <Name=path...> [-o out.img] [-s size_mb] [payload...]}"
+shift
+MENU_MODE=0
+ZEPHYR_BIN=""
+BOOTMENU_BIN=""
+if [ "${1:-}" = "--menu" ]; then
+	MENU_MODE=1
+	BOOTMENU_BIN="${2:?path to the PiZZaBoot zephyr.bin required after --menu}"
+	shift 2
+else
+	ZEPHYR_BIN="${1:?path to zephyr.bin required}"
+	shift
+fi
 
 case "${BOARD}" in
 rpi_zero_2w)
@@ -53,21 +76,107 @@ esac
 OUT="pizza-${BOARD}.img"
 SIZE_MB=256
 PAYLOAD=()
+ENTRY_NAMES=()
+ENTRY_PATHS=()
 while [ $# -gt 0 ]; do
 	case "$1" in
 	-o) OUT="$2"; shift 2 ;;
 	-s) SIZE_MB="$2"; shift 2 ;;
+	*=*)
+		if [ "${MENU_MODE}" = 1 ]; then
+			ENTRY_NAMES+=("${1%%=*}")
+			ENTRY_PATHS+=("${1#*=}")
+		else
+			PAYLOAD+=("$1")
+		fi
+		shift ;;
 	*) PAYLOAD+=("$1"); shift ;;
 	esac
 done
 
-[ -f "${ZEPHYR_BIN}" ] || { echo "error: not found: ${ZEPHYR_BIN}" >&2; exit 1; }
-
 # Stage inputs where the container can see them.
 WORK="${HERE}/.sdcard-work"
 rm -rf "${WORK}" && mkdir -p "${WORK}" "${HERE}/blobs"
-cp "${ZEPHYR_BIN}" "${WORK}/zephyr.bin"
-cp "${CONFIG}" "${WORK}/config.txt"
+
+if [ "${MENU_MODE}" = 1 ]; then
+	[ "${#ENTRY_NAMES[@]}" -ge 1 ] || {
+		echo "error: --menu needs at least one Name=path entry" >&2
+		exit 1
+	}
+	[ -f "${BOOTMENU_BIN}" ] || {
+		echo "error: not found: ${BOOTMENU_BIN}" >&2
+		exit 1
+	}
+	cp "${BOOTMENU_BIN}" "${WORK}/bootmenu.bin"
+
+	# An entry literally named "shell" is not a list entry: it becomes
+	# the menu.txt "shell" key -- the kernel behind PiZZaBoot's `c`
+	# (command line) key, GRUB-style. The default is the first
+	# non-shell entry.
+	DEFAULT_NAME=""
+	for name in "${ENTRY_NAMES[@]}"; do
+		lc="$(printf '%s' "${name}" | tr '[:upper:]' '[:lower:]')"
+		if [ "${lc}" != "shell" ]; then
+			DEFAULT_NAME="${name}"
+			break
+		fi
+	done
+	[ -n "${DEFAULT_NAME}" ] || {
+		echo "error: --menu needs at least one non-shell entry" >&2
+		exit 1
+	}
+
+	{
+		echo "timeout = 5"
+		echo "default = ${DEFAULT_NAME}"
+		echo
+	} > "${WORK}/menu.txt"
+
+	i=0
+	for name in "${ENTRY_NAMES[@]}"; do
+		path="${ENTRY_PATHS[$i]}"
+		[ -f "${path}" ] || { echo "error: not found: ${path}" >&2; exit 1; }
+		lc="$(printf '%s' "${name}" | tr '[:upper:]' '[:lower:]')"
+		if [ "${lc}" = "shell" ]; then
+			slug="shell"
+		else
+			slug="$(printf '%s' "${lc}" | tr -cd 'a-z0-9')"
+		fi
+		[ -n "${slug}" ] || {
+			echo "error: entry name '${name}' has no usable characters" >&2
+			exit 1
+		}
+		[ ! -e "${WORK}/${slug}.bin" ] || {
+			echo "error: duplicate kernel filename ${slug}.bin (entry '${name}')" >&2
+			exit 1
+		}
+		cp "${path}" "${WORK}/${slug}.bin"
+		if [ "${lc}" = "shell" ]; then
+			echo "shell = shell.bin" >> "${WORK}/menu.txt"
+		else
+			echo "${name} = ${slug}.bin" >> "${WORK}/menu.txt"
+		fi
+		i=$((i + 1))
+	done
+
+	# Per-board config template with the kernel= line replaced by the
+	# WO-T1 selector block (default = menu, include = persisted choice,
+	# button held = menu regardless).
+	awk '/^kernel=/{
+		print "gpio=17=ip,pu"
+		print "kernel=bootmenu.bin"
+		print "include chosen.txt"
+		print ""
+		print "[gpio17=0]"
+		print "kernel=bootmenu.bin"
+		print "[all]"
+		next
+	} {print}' "${CONFIG}" > "${WORK}/config.txt"
+else
+	[ -f "${ZEPHYR_BIN}" ] || { echo "error: not found: ${ZEPHYR_BIN}" >&2; exit 1; }
+	cp "${ZEPHYR_BIN}" "${WORK}/zephyr.bin"
+	cp "${CONFIG}" "${WORK}/config.txt"
+fi
 for f in "${PAYLOAD[@]+"${PAYLOAD[@]}"}"; do
 	[ -f "$f" ] || { echo "error: payload not found: $f" >&2; exit 1; }
 	cp "$f" "${WORK}/"
