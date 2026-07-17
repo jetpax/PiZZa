@@ -6,21 +6,19 @@
 #ifndef PIZZABOOT_H_
 #define PIZZABOOT_H_
 
-#include <stdbool.h>
+#include "bootsel.h"
 
-#define PB_MAX_ENTRIES 9	/* one digit key each */
-#define PB_NAME_LEN    32
-#define PB_FILE_LEN    40
+#define PIZZABOOT_VERSION "0.1"
 
-struct pb_entry {
-	char name[PB_NAME_LEN];	/* display label (menu.txt key) */
-	char file[PB_FILE_LEN];	/* kernel file on the boot FAT */
-	bool present;		/* file exists on the card */
-};
+#define PB_MAX_ENTRIES BOOTSEL_MAX_ENTRIES
+#define PB_NAME_LEN    BOOTSEL_NAME_LEN
+#define PB_FILE_LEN    BOOTSEL_FILE_LEN
 
-/* HDMI list renderer (hdmi.c). status may be NULL. */
+/* HDMI list renderer (hdmi.c). status may be NULL; have_shell shows
+ * the "Press c for a command line" help line.
+ */
 int hdmi_init(void);
-void hdmi_render(const struct pb_entry *ents, int n, int sel,
-		 const char *status);
+void hdmi_render(const struct bootsel_entry *ents, int n, int sel,
+		 bool have_shell, const char *status);
 
 #endif /* PIZZABOOT_H_ */

@@ -28,13 +28,16 @@
 #define FB_W 640
 #define FB_H 480
 
-#define COL_BG       0xFF101822u
-#define COL_TITLE    0xFFF0C020u
-#define COL_TEXT     0xFFB8C0C8u
-#define COL_MISSING  0xFF5A6068u
-#define COL_SEL_BG   0xFF2C4058u
-#define COL_SEL_TEXT 0xFFFFFFFFu
-#define COL_HINT     0xFF60707Cu
+/* Classic GRUB 0.5.x look: VGA blue field, white text, light bar.
+ * Deliberately distinct from the RetroPiZZa launcher's dark theme so
+ * the two full-screen lists are never mistaken for each other.
+ */
+#define COL_BG       0xFF0000A8u
+#define COL_TEXT     0xFFFFFFFFu
+#define COL_MISSING  0xFF9098C0u
+#define COL_SEL_BG   0xFFE8E8E8u
+#define COL_SEL_TEXT 0xFF0000A8u
+#define COL_HELP     0xFFB8B8B8u
 
 static const struct device *display_dev;
 static bool hdmi_ok;
@@ -105,23 +108,34 @@ int hdmi_init(void)
 	return 0;
 }
 
-void hdmi_render(const struct pb_entry *ents, int n, int sel,
-		 const char *status)
+void hdmi_render(const struct bootsel_entry *ents, int n, int sel,
+		 bool have_shell, const char *status)
 {
 	if (!hdmi_ok) {
 		return;
 	}
 
-	const int item_scale = 3;
-	const int item_h = 8 * item_scale + 10;
-	const int list_top = 110;
-	const int list_x = 48;
+	const int item_scale = 2;
+	const int row_h = 8 * item_scale + 8;
+	const int box_x = 12;
+	const int box_y = 44;
+	const int box_w = FB_W - 2 * box_x;
+	const int box_rows = 12;
+	const int box_h = box_rows * row_h + 12;
+	const int list_x = box_x + 16;
+	const int list_top = box_y + 10;
 
 	for (int i = 0; i < FB_W * FB_H; i++) {
 		fb[i] = COL_BG;
 	}
 
-	draw_text(list_x, 28, "PiZZaBoot", 4, COL_TITLE);
+	draw_text(box_x, 14, "PiZZaBoot  version " PIZZABOOT_VERSION, 2,
+		  COL_TEXT);
+
+	fill_rect(box_x, box_y, box_w, 2, COL_TEXT);
+	fill_rect(box_x, box_y + box_h - 2, box_w, 2, COL_TEXT);
+	fill_rect(box_x, box_y, 2, box_h, COL_TEXT);
+	fill_rect(box_x + box_w - 2, box_y, 2, box_h, COL_TEXT);
 
 	if (n == 0) {
 		draw_text(list_x, list_top, "no boot entries", item_scale,
@@ -129,27 +143,41 @@ void hdmi_render(const struct pb_entry *ents, int n, int sel,
 	}
 
 	for (int i = 0; i < n && i < PB_MAX_ENTRIES; i++) {
-		int y = list_top + i * item_h;
+		int y = list_top + i * row_h;
 		uint32_t col = ents[i].present ? COL_TEXT : COL_MISSING;
 
 		if (i == sel) {
-			fill_rect(list_x - 16, y - 5,
-				  FB_W - 2 * (list_x - 16), item_h,
+			fill_rect(box_x + 2, y - 3, box_w - 4, row_h,
 				  COL_SEL_BG);
 			col = ents[i].present ? COL_SEL_TEXT : COL_MISSING;
-			draw_text(list_x, y, ">", item_scale, COL_SEL_TEXT);
 		}
-		draw_text(list_x + 8 * item_scale + 8, y, ents[i].name,
-			  item_scale, col);
+		draw_text(list_x, y, ents[i].name, item_scale, col);
 		if (!ents[i].present) {
-			draw_text(FB_W - 190, y, "missing", 2, COL_MISSING);
+			draw_text(box_x + box_w - 100, y + 4, "(missing)", 1,
+				  col == COL_SEL_TEXT ? COL_SEL_TEXT :
+				  COL_MISSING);
 		}
 	}
 
-	draw_text(list_x, FB_H - 60,
-		  "button: short next / long boot", 1, COL_HINT);
+	int hy = box_y + box_h + 16;
+
+	draw_text(box_x + 8, hy,
+		  "Use the up and down arrows (or short button presses) to",
+		  1, COL_HELP);
+	draw_text(box_x + 8, hy + 14,
+		  "select which entry is highlighted.", 1, COL_HELP);
+	draw_text(box_x + 8, hy + 34,
+		  "Press enter or a digit, or hold the button, to boot the",
+		  1, COL_HELP);
+	draw_text(box_x + 8, hy + 48,
+		  "selected image.", 1, COL_HELP);
+	if (have_shell) {
+		draw_text(box_x + 8, hy + 68,
+			  "Press c for a command line.", 1, COL_HELP);
+	}
+
 	if (status != NULL && status[0] != '\0') {
-		draw_text(list_x, FB_H - 36, status, 1, COL_TITLE);
+		draw_text(box_x + 8, FB_H - 30, status, 1, COL_TEXT);
 	}
 
 	struct display_buffer_descriptor desc = {
