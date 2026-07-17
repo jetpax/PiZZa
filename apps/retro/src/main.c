@@ -6,11 +6,16 @@
 
 #include <zephyr/kernel.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "sdl2shim.h"
 #include "retro_frontend.h"
 #include "retro_core.h"
 #include "retro_clock.h"
+
+#ifdef CONFIG_SOC_BCM2710
+#include "bootsel.h"
+#endif
 
 #ifdef CONFIG_SDL2SHIM_AUDIO_HDMI
 #include "retro_audio.h"
@@ -69,6 +74,18 @@ int main(void)
 			k_msleep(1000);
 			continue;
 		}
+
+#ifdef CONFIG_SOC_BCM2710
+		if (strcmp(core_path, RETRO_MENU_EXIT_PATH) == 0) {
+			printf("[retro] exit to boot menu\n");
+
+			int rc = bootsel_menu();
+
+			printf("[retro] bootsel_menu failed (%d)\n", rc);
+			k_msleep(1000);
+			continue;
+		}
+#endif
 		retro_core_set_path(core_path);
 
 		if (retro_frontend_open() != 0) {

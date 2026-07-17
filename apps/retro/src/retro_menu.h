@@ -9,6 +9,11 @@
 
 #include <stddef.h>
 
+/* Sentinel out_path from retro_menu_run: the user picked "Exit to
+ * boot menu" (Pi boards only) -- caller hands off to bootsel.
+ */
+#define RETRO_MENU_EXIT_PATH "!bootmenu"
+
 /* Render the core picker, drive it from the shim event queue (pad /
  * `retro key` shell), and block until the user launches a core.
  * Fills out_path with the chosen .llext path. Returns 0 on a launch,

@@ -280,7 +280,7 @@ static int poll_action(void)
  */
 static int run_picker(const char *title, const char *dir, const char *exts,
 		      bool strip, const char *footer, bool allow_back,
-		      char *out_path, size_t out_sz)
+		      bool exit_entry, char *out_path, size_t out_sz)
 {
 	int sel = 0;
 
@@ -298,6 +298,20 @@ static int run_picker(const char *title, const char *dir, const char *exts,
 	entry_count = scan(dir, exts, strip);
 	LOG_INF("%d entr%s in %s", entry_count,
 		entry_count == 1 ? "y" : "ies", dir);
+
+	/* Tier-1 escape hatch (WO-T1 M2): a synthetic last entry that
+	 * hands the board back to the PiZZaBoot menu. With it in the
+	 * list the empty-rescan path below never triggers for the
+	 * launcher -- acceptable: a card with no cores has nothing to
+	 * wait for, and the entry is the way out.
+	 */
+	if (exit_entry && entry_count < MAX_ENTRIES) {
+		strncpy(entries[entry_count].name, "Exit to boot menu",
+			NAME_MAX - 1);
+		strncpy(entries[entry_count].path, RETRO_MENU_EXIT_PATH,
+			PATH_MAX - 1);
+		entry_count++;
+	}
 
 	/* Drop any keys held from the return chord / previous screen. */
 	SDL_Event drain;
@@ -346,7 +360,9 @@ static int run_picker(const char *title, const char *dir, const char *exts,
 int retro_menu_run(char *out_path, size_t out_sz)
 {
 	return run_picker("RetroPiZZa", MENU_DIR, "llext", true,
-			  "d-pad move   A launch", false, out_path, out_sz);
+			  "d-pad move   A launch", false,
+			  IS_ENABLED(CONFIG_SOC_BCM2710),
+			  out_path, out_sz);
 }
 
 int retro_menu_browse_content(const char *title, const char *exts,
@@ -354,5 +370,6 @@ int retro_menu_browse_content(const char *title, const char *exts,
 {
 	return run_picker(title != NULL ? title : "Select content",
 			  CONFIG_RETRO_CONTENT_DIR, exts, false,
-			  "A load   Home back", true, out_path, out_sz);
+			  "A load   Home back", true, false,
+			  out_path, out_sz);
 }

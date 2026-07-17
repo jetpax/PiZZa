@@ -144,6 +144,18 @@ if(CONFIG_SHELL)
   list(APPEND RETRO_SRC src/retro_shell.c)
 endif()
 
+# Tier-1 boot selection (apps/lib/bootsel, WO-T1 M2): `boot` shell
+# verbs + the launcher's "Exit to boot menu" entry. Pi-only -- the PM
+# reset block is BCM283x MMIO, so qemu builds skip it.
+if(CONFIG_SOC_BCM2710)
+  list(APPEND RETRO_SRC
+    ../lib/bootsel/bootsel.c
+    ../lib/bootsel/bootsel_shell.c
+    src/retro_uart_input.c
+  )
+  target_include_directories(app PRIVATE ../lib/bootsel)
+endif()
+
 # Frame present backend (app-local, as for every shim consumer).
 if(CONFIG_RETRO_PRESENT_DISPLAY)
   list(APPEND RETRO_SRC src/retro_present_display.c)
