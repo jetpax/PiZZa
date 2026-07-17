@@ -1,0 +1,56 @@
+/*
+ * PiZZaBoot -- rpi_zero_2w overlay.
+ *
+ * Menu console on the mini-UART (GPIO14/15 @ 115200, per the canonical
+ * config.txt enable_uart=1), mirrored on USB CDC ACM. HDMI list drawn
+ * into a 640x480 virtual framebuffer that the VideoCore HVS upscales
+ * to the monitor's native mode (render-width/render-height).
+ */
+
+&mbox0 {
+	status = "okay";
+};
+
+&firmware {
+	status = "okay";
+};
+
+&vc_fb {
+	render-width = <640>;
+	render-height = <480>;
+	status = "okay";
+};
+
+&usb {
+	status = "okay";
+
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+		label = "PiZZaBoot menu (USB CDC ACM)";
+	};
+};
+
+/ {
+	fstab {
+		compatible = "zephyr,fstab";
+
+		sd_fs: sd {
+			compatible = "zephyr,fstab,fatfs";
+			automount;
+			disk-access;
+			mount-point = "/SD:";
+		};
+	};
+
+	chosen {
+		zephyr,console = &uart1;
+		zephyr,display = &vc_fb;
+	};
+};
+
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_gpio14>;
+	status = "okay";
+	current-speed = <115200>;
+};
