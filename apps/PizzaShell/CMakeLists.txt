@@ -13,4 +13,9 @@ if(CONFIG_USB_DEVICE_STACK_NEXT)
   include(${ZEPHYR_BASE}/samples/subsys/usb/common/common.cmake)
 endif()
 
-target_sources(app PRIVATE src/main.c)
+target_sources(app PRIVATE
+  src/main.c
+  ../lib/bootsel/bootsel.c
+  ../lib/bootsel/bootsel_shell.c
+)
+target_include_directories(app PRIVATE ../lib/bootsel)
