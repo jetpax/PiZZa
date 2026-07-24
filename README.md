@@ -1,4 +1,6 @@
-# 🍕 PiZZa  — Raspberry Pi Zero with Zephyr
+# 🍕 PiZZa  — Raspberry Pi Zero on Zephyr RTOS
+
+Lightning boot time, no bloat and hard real time performance, all on a quad-core 1GHz microcontroller
 
 Boots to a shell over a **USB-CDC ACM console** — plug a single
 micro-USB cable from the Pi into your laptop and the Pi shows up as
