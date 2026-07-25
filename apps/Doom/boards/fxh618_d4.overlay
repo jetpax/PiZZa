@@ -1,0 +1,21 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * PiZZa sdl2-doom overlay for fxh618_d4 (Allwinner H618 TV box).
+ *
+ * The board already enables the DE33 -> TCON-TV0 -> DW-HDMI pipeline and
+ * points zephyr,display at it, so all this has to do is ask for a render
+ * surface at Doom's native size. The display driver reports 320x200
+ * capabilities and scales x5 to 1600x1000 centred in the 1080p60 mode,
+ * which is the same division of labour as the VideoCore HVS on
+ * rpi_zero_2w -- the port itself is board-agnostic.
+ *
+ * Console, shell and logs all share uart0 (the board's only header UART,
+ * 115200 8N1): no USB CDC endpoint on this box, so the `doom` shell
+ * command set shares the port with the log output.
+ */
+
+&display {
+	render-width = <320>;
+	render-height = <200>;
+};
