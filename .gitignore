@@ -1,4 +1,9 @@
-# Working notes — session-local, not part of the shipped repo
+# Working notes — session-local, not part of the shipped repo.
+# The whole directory, not patterns within it: the name-based rules below
+# are case- and extension-sensitive and miss things like
+# notes/wo-gl4-1-gllite-videocore-iv.html. Planning docs belong in
+# ~/github/SS/notes; anything landing here is a scratch copy.
+notes/
 HANDOVER*
 WORK_ORDER*
 *WORK-ORDER*
@@ -6,7 +11,6 @@ WORK_ORDER*
 WO-*.md
 *_PLAN.md
 *_SCOPE.md
-notes/frames/
 
 # make-sdcard.sh outputs + caches
 /blobs/
