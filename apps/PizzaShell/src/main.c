@@ -177,23 +177,36 @@ static inline int pizza_usb_start(void) { return 0; }
 #if DT_HAS_CHOSEN(zephyr_display)
 
 /*
- * Splash the HDMI scanout with a CMYKWRGB bar pattern at boot. One
- * scanline is rendered into a static row buffer and repeated for every
- * line of the framebuffer. 1920 covers every Pi HDMI mode VC hands us;
- * the row buffer is static BSS so a fault here doesn't blow main's stack.
+ * Splash the HDMI scanout with a test card at boot, at whatever
+ * resolution the display reports. Each element diagnoses a different
+ * scanout fault by eye:
+ *   - white 8px border: clipping, overscan, geometry
+ *   - corner squares (TL red, TR green, BL blue, BR white): origin,
+ *     mirroring and pitch errors, which show as shear or as a wrapped
+ *     corner
+ *   - eight vertical colour bars: pixel format and channel order
+ *   - horizontal grayscale gradient: bit depth, banding, RGB skew
+ * The border and corners are absolute sizes, not fractions, so the
+ * finer the mode the tighter a clipping fault they catch.
+ *
+ * Rows are rendered one at a time into a static row buffer. 1920 covers
+ * every Pi HDMI mode VC hands us; the buffer is static BSS so a fault
+ * here doesn't blow main's stack.
  */
 #define PIZZA_DISPLAY_MAX_W 1920U
+#define PIZZA_DISPLAY_BORDER 8U
+#define PIZZA_DISPLAY_CORNER 64U
 static uint32_t pizza_display_row[PIZZA_DISPLAY_MAX_W];
 
 static const uint32_t pizza_display_bars[] = {
-	0xFF00FFFFU, /* Cyan */
-	0xFFFF00FFU, /* Magenta */
-	0xFFFFFF00U, /* Yellow */
-	0xFF000000U, /* Key (black) */
 	0xFFFFFFFFU, /* White */
-	0xFFFF0000U, /* Red */
+	0xFFFFFF00U, /* Yellow */
+	0xFF00FFFFU, /* Cyan */
 	0xFF00FF00U, /* Green */
+	0xFFFF00FFU, /* Magenta */
+	0xFFFF0000U, /* Red */
 	0xFF0000FFU, /* Blue */
+	0xFF000000U, /* Key (black) */
 };
 
 /*
@@ -230,7 +243,7 @@ static void pizza_display_paint(void)
 	const struct device *dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
 	struct display_capabilities caps;
 	struct display_buffer_descriptor desc;
-	uint16_t w, h;
+	uint16_t w, h, gband_top, gband_bot;
 	const size_t n = ARRAY_SIZE(pizza_display_bars);
 
 	if (!device_is_ready(dev) || !pizza_display_has_monitor()) {
@@ -244,18 +257,47 @@ static void pizza_display_paint(void)
 		return;
 	}
 
-	for (uint16_t x = 0; x < w; x++) {
-		const size_t band = ((size_t)x * n) / w;
-
-		pizza_display_row[x] = pizza_display_bars[band];
-	}
-
 	desc.buf_size = (size_t)w * sizeof(uint32_t);
 	desc.width    = w;
 	desc.height   = 1;
 	desc.pitch    = w;
 
+	/* The gradient occupies the third quarter of the height, so the
+	 * bars are read against a flat field above it and a ramp below.
+	 */
+	gband_top = h / 2U;
+	gband_bot = 3U * h / 4U;
+
 	for (uint16_t y = 0; y < h; y++) {
+		for (uint16_t x = 0; x < w; x++) {
+			uint32_t px;
+
+			if (y < PIZZA_DISPLAY_BORDER ||
+			    y >= h - PIZZA_DISPLAY_BORDER ||
+			    x < PIZZA_DISPLAY_BORDER ||
+			    x >= w - PIZZA_DISPLAY_BORDER) {
+				px = 0xFFFFFFFFU;
+			} else if (y < PIZZA_DISPLAY_CORNER &&
+				   x < PIZZA_DISPLAY_CORNER) {
+				px = 0xFFFF0000U;
+			} else if (y < PIZZA_DISPLAY_CORNER &&
+				   x >= w - PIZZA_DISPLAY_CORNER) {
+				px = 0xFF00FF00U;
+			} else if (y >= h - PIZZA_DISPLAY_CORNER &&
+				   x < PIZZA_DISPLAY_CORNER) {
+				px = 0xFF0000FFU;
+			} else if (y >= h - PIZZA_DISPLAY_CORNER &&
+				   x >= w - PIZZA_DISPLAY_CORNER) {
+				px = 0xFFFFFFFFU;
+			} else if (y >= gband_top && y < gband_bot) {
+				const uint32_t g = ((uint32_t)x * 255U) / w;
+
+				px = 0xFF000000U | (g << 16) | (g << 8) | g;
+			} else {
+				px = pizza_display_bars[((size_t)x * n) / w];
+			}
+			pizza_display_row[x] = px;
+		}
 		(void)display_write(dev, 0, y, &desc, pizza_display_row);
 	}
 }
@@ -268,7 +310,7 @@ int main(void)
 	/* First print: board console (mini-UART logs path). */
 	printk("%s", banner);
 
-	/* Splash CMYKWRGB bars on HDMI (no-op without a chosen display). */
+	/* Splash the test card on HDMI (no-op without a chosen display). */
 	pizza_display_paint();
 
 	/* Bring up USB CDC + DTR banner callback (no-op without USB). */
