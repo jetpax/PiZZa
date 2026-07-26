@@ -1,0 +1,30 @@
+/*
+ * Copyright (c) 2026 jetpax <jetpax@users.noreply.github.com>
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Mount the box's microSD at /SD: so the `pizza` storage line and
+ * `fs ls /SD:` work as soon as the shell is up. The board DTS already
+ * enables &smhc0 and registers the disk as "SD"; this fstab plus
+ * CONFIG_FS_FATFS_FSTAB_AUTOMOUNT=y does the mount at boot.
+ *
+ * Format-on-mount-fail safety matters more here than on the Pi: this
+ * card carries the fel-sdboot stub in the first 16 KB of the raw
+ * device, so a stray format costs the FEL boot path, not just data.
+ * CONFIG_FILE_SYSTEM_MKFS and CONFIG_FS_FATFS_MOUNT_MKFS are both
+ * forced off in boards/fxh618_d4.conf. (The per-instance `no-format`
+ * property is rejected by FATFS' BUILD_ASSERT; Kconfig is the
+ * supported mechanism.) A failed mount then just logs and leaves the
+ * storage line reading "(SD not mounted: -N)".
+ */
+/ {
+	fstab {
+		compatible = "zephyr,fstab";
+
+		sd_fs: sd {
+			compatible = "zephyr,fstab,fatfs";
+			automount;
+			disk-access;
+			mount-point = "/SD:";
+		};
+	};
+};
