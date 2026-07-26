@@ -57,12 +57,24 @@
 #if defined(CONFIG_SOC_BCM2835)
 #define PIZZA_BOARD_NAME  "Raspberry Pi Zero W"
 #define PIZZA_SOC_STR     "Broadcom BCM2835 (ARM1176JZF-S, ARMv6KZ AArch32)"
+#elif defined(CONFIG_SOC_SUN50I_H618)
+#define PIZZA_BOARD_NAME  "Transpeed FX-H618-D4"
+#define PIZZA_SOC_STR     "Allwinner H618 (Cortex-A53 quad, ARMv8-A AArch64)"
 #else
 #define PIZZA_BOARD_NAME  "Raspberry Pi Zero 2 W"
 #define PIZZA_SOC_STR     "Broadcom BCM2710 (Cortex-A53 quad, ARMv8-A AArch64)"
 #endif
 
-#if IS_ENABLED(CONFIG_USBD_CDC_ACM_CLASS)
+/*
+ * Console identity. With CDC ACM the shell moves to USB and the UART
+ * carries logs alone; otherwise the two share one port and there is no
+ * separate logs channel to name. The STB brings no USB device port out,
+ * so it is always the plain-UART case.
+ */
+#if defined(CONFIG_SOC_SUN50I_H618)
+#define PIZZA_CONSOLE_STR "uart0 (dw-apb) on the board header (you're here)"
+#define PIZZA_LOGS_STR    "--"
+#elif IS_ENABLED(CONFIG_USBD_CDC_ACM_CLASS)
 #define PIZZA_CONSOLE_STR "USB CDC ACM (you're here)"
 #define PIZZA_LOGS_STR    "PL011 / mini-UART on GPIO 14/15"
 #else
