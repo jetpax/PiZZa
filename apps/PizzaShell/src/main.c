@@ -364,11 +364,22 @@ static const char nf_color_bar[] =
  * rendering pass is pure formatting. Each writes "--" on platforms
  * where the backing subsystem is not compiled in.
  */
+/*
+ * The die sensor is found through the board's die-temp0 alias, never by
+ * matching a compatible: a compatible ties this file to one SoC, and
+ * silently reads "(n/a)" for ever if the binding is renamed -- which is
+ * exactly what happened when raspberrypi,bcm2835-vc-thermal became
+ * raspberrypi,bcm283x-vc-thermal. Any board that wants a temperature
+ * here only has to declare the alias.
+ */
+#define PIZZA_HAS_DIE_TEMP \
+	(IS_ENABLED(CONFIG_SENSOR) && DT_HAS_ALIAS(die_temp0) && \
+	 DT_NODE_HAS_STATUS_OKAY(DT_ALIAS(die_temp0)))
+
 static void pizza_snapshot_temp(char *buf, size_t len)
 {
-#if IS_ENABLED(CONFIG_SENSOR)
-	const struct device *thermal =
-		DEVICE_DT_GET_ANY(raspberrypi_bcm2835_vc_thermal);
+#if PIZZA_HAS_DIE_TEMP
+	const struct device *thermal = DEVICE_DT_GET(DT_ALIAS(die_temp0));
 	struct sensor_value t;
 
 	if (thermal == NULL || !device_is_ready(thermal) ||
@@ -621,11 +632,11 @@ static int cmd_pizza_wifi(const struct shell *sh, size_t argc, char **argv)
 static int cmd_pizza_temp(const struct shell *sh, size_t argc, char **argv)
 {
 	ARG_UNUSED(argc); ARG_UNUSED(argv);
-#if IS_ENABLED(CONFIG_SENSOR)
-	const struct device *thermal = DEVICE_DT_GET_ANY(raspberrypi_bcm2835_vc_thermal);
+#if PIZZA_HAS_DIE_TEMP
+	const struct device *thermal = DEVICE_DT_GET(DT_ALIAS(die_temp0));
 
-	if (!thermal || !device_is_ready(thermal)) {
-		shell_warn(sh, "vc-thermal sensor not ready");
+	if (!device_is_ready(thermal)) {
+		shell_warn(sh, "die-temp0 sensor not ready");
 		return -ENODEV;
 	}
 	struct sensor_value t;
