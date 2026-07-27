@@ -23,3 +23,10 @@ hdmi_force_hotplug=1
 # hdmi_force_hotplug the firmware otherwise falls back to DVI when
 # EDID is absent or ambiguous. Required for HDMI audio.
 hdmi_drive=2
+
+# Hand the whole panel to the framebuffer. The firmware's default
+# overscan compensation insets 48 px on every side, so a 1080p mode
+# allocates 1824x984 and an app that trusts display_get_capabilities
+# draws a picture that does not reach the edges. Nothing on a modern
+# monitor needs the inset.
+disable_overscan=1
