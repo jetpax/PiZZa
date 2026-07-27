@@ -5,7 +5,13 @@
 # microSD card (see make-sdcard.sh to create one).
 #
 # Usage:
-#   install-to-sdcard.sh [rpi_zero_2w|rpi_zero_w] [<boot-partition-mount>] <path-to-zephyr.bin>
+#   install-to-sdcard.sh [rpi_zero_2w|rpi_zero_w] [--slot <name>] \
+#                        [<boot-partition-mount>] <path-to-zephyr.bin>
+#
+# --slot is for multi-app boot-menu cards (make-sdcard.sh --menu): it
+# names the menu.txt entry to replace, e.g. --slot RetroPiZZa or
+# --slot shell. On such a card --slot is REQUIRED and config.txt is
+# never rewritten; run without it to have the available slots listed.
 #
 # The board defaults to rpi_zero_2w. THE BOARDS ARE NOT INTERCHANGEABLE:
 # the Zero 2 W boots a 64-bit kernel at 0x200000, the original Zero W a
@@ -45,6 +51,13 @@ rpi_zero_2w|rpi_zero_w)
 	shift
 	;;
 esac
+
+# Optional slot selector, for multi-app boot-menu cards.
+SLOT=""
+if [ "${1:-}" = "--slot" ]; then
+	SLOT="${2:?usage: --slot <menu entry name>}"
+	shift 2
+fi
 case "$BOARD" in
 rpi_zero_2w) CONFIG_SRC="$HERE/config.txt" ;;
 rpi_zero_w)  CONFIG_SRC="$HERE/config-rpi_zero_w.txt" ;;
@@ -89,6 +102,66 @@ if [ ! -f "$MOUNT/bootcode.bin" ] || [ ! -f "$MOUNT/start.elf" ]; then
 	echo "       (no bootcode.bin or start.elf present)" >&2
 	echo "       Flash a PiZZa image first -- see make-sdcard.sh / Releases." >&2
 	exit 1
+fi
+
+# A multi-app boot-menu card (make-sdcard.sh --menu) stages PiZZaBoot as
+# bootmenu.bin plus a menu.txt naming one kernel per entry, and its
+# config.txt is the WO-T1 selector -- kernel=bootmenu.bin, include
+# chosen.txt, and the [gpio17=0] force-menu block. Writing zephyr.bin and
+# a single-kernel config.txt over that would silently retarget whichever
+# entry happens to be called zephyr.bin AND destroy the selector, taking
+# the whole menu with it. So on a menu card an explicit --slot is
+# required and config.txt is left alone.
+IS_MENU_CARD=0
+if [ -f "$MOUNT/bootmenu.bin" ] && [ -f "$MOUNT/menu.txt" ]; then
+	IS_MENU_CARD=1
+fi
+
+menu_slots() {
+	awk -F= '/^[[:space:]]*[^#[:space:]]/ {
+		key = $1
+		gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+		if (key == "timeout" || key == "default") next
+		print key
+	}' "$MOUNT/menu.txt"
+}
+
+if [ "$IS_MENU_CARD" = 1 ] && [ -z "$SLOT" ]; then
+	echo "error: $MOUNT is a boot-menu card; --slot <name> is required" >&2
+	echo "       Installing without it would overwrite the wrong kernel" >&2
+	echo "       and destroy the menu's config.txt. Available slots:" >&2
+	menu_slots | sed 's/^/         /' >&2
+	exit 1
+fi
+if [ "$IS_MENU_CARD" = 0 ] && [ -n "$SLOT" ]; then
+	echo "error: --slot given but $MOUNT is not a boot-menu card" >&2
+	echo "       (no bootmenu.bin / menu.txt present)" >&2
+	exit 1
+fi
+
+if [ "$IS_MENU_CARD" = 1 ]; then
+	TARGET=$(awk -F= -v want="$SLOT" '{
+		key = $1; val = $2
+		gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+		gsub(/^[[:space:]]+|[[:space:]]+$/, "", val)
+		if (key == want) { print val; exit }
+	}' "$MOUNT/menu.txt")
+	if [ -z "$TARGET" ]; then
+		echo "error: no menu entry named '$SLOT'. Available slots:" >&2
+		menu_slots | sed 's/^/         /' >&2
+		exit 1
+	fi
+	cp "$ZEPHYR_BIN" "$MOUNT/$TARGET"
+	echo "Installed $(basename "$ZEPHYR_BIN") to $MOUNT/$TARGET (slot '$SLOT')."
+	echo "config.txt and menu.txt left untouched."
+	echo "Eject the card and boot the Pi:"
+	echo
+	case "$(uname -s)" in
+	Darwin) echo "  diskutil eject \"$MOUNT\"" ;;
+	Linux)  echo "  udisksctl unmount -b \"\$(findmnt -no SOURCE \"$MOUNT\")\"" ;;
+	*)      echo "  (eject the card via your OS's usual mechanism)" ;;
+	esac
+	exit 0
 fi
 
 cp "$ZEPHYR_BIN" "$MOUNT/zephyr.bin"
