@@ -9,6 +9,10 @@ GPIO header soldering. BCM2710 peripherals, microSD, USB UDC, and
 SDIO Wi-Fi (CYW43439) are all enabled. Runs on the **Raspberry Pi
 Zero 2 W** and the original **Pi Zero W**.
 
+The shipped card is a **boot-menu card**: PiZZaBoot picks at power-on
+between RetroPiZZa, the Arduino sketch loader, MicroPython and the PiZZa
+shell, and remembers the choice — see [Flash the SD card](#flash-the-sd-card).
+
 PiZZa also has an  **Arduino board package**, so you can write sketches in the
 Arduino IDE and Upload over the same single USB cable. The loader
 receives the sketch, stores it on the SD card and runs it natively as
@@ -72,7 +76,7 @@ out of scope. Legend: ✅ enabled · 🚧 planned · ❌ not planned · — N/A.
 | Composite video | ❌ | not planned |
 | **CPU / Kernel** | | |
 | AArch64 | ✅ | Cortex-A53; shipped shell images are single-core today |
-| SMP (4 cores) | ✅ | spin-table boot + BCM2836 mailbox IPI + FPU sharing on [`jetpax/zephyr` `dev`](https://github.com/jetpax/zephyr/tree/dev); kernel `smp` and `smp_stress` suites pass on hardware ([#1](https://github.com/jetpax/PiZZa/issues/1)); lands in the next image release |
+| SMP (4 cores) | ✅ | spin-table boot + BCM2836 mailbox IPI + FPU sharing; kernel `smp` and `smp_stress` suites pass on hardware ([#1](https://github.com/jetpax/PiZZa/issues/1)). Opt-in per app: [`apps/Wipeout`](apps/Wipeout) renders across all four cores; the boot-menu entries are single-core |
 | CPU frequency scaling | 🚧 | runs at idle clock (~600 MHz) from USB power |
 | MMU + cache | ✅ | configured per the BCM2710 SoC tree |
 | **USB** | | |
@@ -113,7 +117,25 @@ Grab a `pizza-*.img.xz` from
 with [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
 (**Use custom**) or balenaEtcher. That's the whole install: the image is
 a single FAT32 boot partition carrying the pinned Raspberry Pi boot
-blobs, `config.txt`, and the Zephyr app.
+blobs, `config.txt`, and the Zephyr apps.
+
+The stock image carries four apps and a boot menu:
+
+| Entry | What it is |
+| --- | --- |
+| **RetroPiZZa** (default) | libretro launcher — cores and content off the SD card, HVS-scaled video and HDMI audio, Bluetooth pad ([`apps/retro`](apps/retro/README.md)) |
+| **Arduino** | sketch loader for the Arduino IDE ([`apps/Arduino`](apps/Arduino/README.md)) |
+| **MicroPython** | MicroPython REPL on the USB-CDC console |
+| **PiZZa Shell** | the Zephyr shell image — peripherals, storage, Wi-Fi ([`apps/PizzaShell`](apps/PizzaShell/README.md)) |
+
+The menu ([`apps/PiZZaBoot`](apps/PiZZaBoot)) draws on HDMI, the mini-UART
+and the USB-CDC console at the same time. Pick with the arrow keys and
+Enter, or with a button wired between **GPIO 17 and GND** — a short press
+cycles, a long press boots. Your pick is written to `chosen.txt` and
+becomes the default, so every later boot goes straight into that app with
+no menu and no added boot time. Hold GPIO 17 low at power-on to force the
+menu back. A fresh card ships no `chosen.txt`, so first boot always shows
+the menu, with a five-second countdown to RetroPiZZa.
 
 To image a card from a local build instead, use the builder at the repo
 root (Docker, loop-free, works the same on macOS and Linux):
@@ -123,6 +145,18 @@ root (Docker, loop-free, works the same on macOS and Linux):
 ./make-sdcard.sh rpi_zero_w  path/to/zephyr.bin
 # extra payload files (game assets, disk images) are copied onto the FAT:
 ./make-sdcard.sh rpi_zero_2w build/doom/zephyr/zephyr.bin -o pizza-doom.img doom.img
+```
+
+`--menu` builds a boot-menu card instead: PiZZaBoot becomes the
+`config.txt` kernel, each entry is staged as its own kernel, and the
+first entry is the default.
+
+```sh
+./make-sdcard.sh rpi_zero_2w --menu build-bootmenu/zephyr/zephyr.bin \
+  "RetroPiZZa=build-retro/zephyr/zephyr.bin" \
+  "Arduino=build-arduino/zephyr/zephyr.bin" \
+  "MicroPython=build-mpy/zephyr/zephyr.bin" \
+  "PiZZa Shell=build-shell/zephyr/zephyr.bin" -o pizza-menu.img
 ```
 
 ## Update an existing card
@@ -157,6 +191,16 @@ To swap the Zephyr app on an already-flashed card:
    interchangeable). Your previous `config.txt` is preserved as
    `config.txt.orig` on the first run.
 
+   On a **boot-menu card** you must name the entry to replace with
+   `--slot`. The script refuses without it and lists the available
+   slots, and it never rewrites `config.txt` or `menu.txt` there — a
+   plain install would otherwise overwrite the wrong kernel and take
+   the menu's boot selector with it.
+
+   ```sh
+   ./install-to-sdcard.sh --slot RetroPiZZa ~/Downloads/retro.bin
+   ```
+
 4. **Eject** the card. The installer prints the right one-liner for your
    OS:
 
@@ -170,6 +214,13 @@ To swap the Zephyr app on an already-flashed card:
    serial device in one go.
 
 ## First boot
+
+A freshly flashed boot-menu card comes up in PiZZaBoot: the menu is on
+HDMI and on both serial consoles, and it counts down five seconds to
+RetroPiZZa. Pick **PiZZa Shell** to get the Zephyr shell described
+below; that choice sticks until you change it from the menu (hold the
+GPIO 17 button at power-on) or from the shell (`boot menu`, `boot
+<name>`).
 
 Once the Pi enumerates over USB it appears on the host as a serial
 device. Open it with any terminal program — CDC ignores the baud
@@ -203,6 +254,11 @@ uart:~$ kernel uptime
 uart:~$ kernel version
 uart:~$ device list
 
+# Boot selection (boot-menu cards)
+uart:~$ boot list                          # entries; * = the persisted choice
+uart:~$ boot Arduino                       # persist and reboot into an entry
+uart:~$ boot menu                          # drop the choice, reboot into the menu
+
 # Hardware info
 uart:~$ hwinfo devid                       # 64-bit OTP board serial
 uart:~$ sensor get vc-thermal              # die temperature
@@ -223,9 +279,11 @@ uart:~$ net dns google.com
 
 ## What's in the image
 
-The image is built from
-[`jetpax/zephyr`](https://github.com/jetpax/zephyr) at the SHA listed on
-the corresponding GitHub Release. It bundles:
+Release images are built from the
+[`jetpax/zephyr`](https://github.com/jetpax/zephyr) `dev` branch at the
+SHA listed on the corresponding GitHub Release. `dev` is the superset
+that carries every `zp*` staging branch below plus the four-core SMP and
+PWM work. It bundles:
 
 | Subsystem | Driver | Source branch |
 | --- | --- | --- |
@@ -245,7 +303,8 @@ the corresponding GitHub Release. It bundles:
 | microSD (external slot) | BCM283x legacy SDHost | [zp13](https://github.com/jetpax/zephyr/tree/zp13-sdhc-bcm2835-sdhost) |
 | SDIO (on-chip Wi-Fi bus) | Arasan SDHCI | [zp14](https://github.com/jetpax/zephyr/tree/zp14-sdhc-bcm2835-sdhci) |
 | Wi-Fi | brcmfmac, native L2, WPA2-PSK | [zp16](https://github.com/jetpax/zephyr/tree/zp16-wifi-brcmfmac) |
-| PWM | BCM283x PWM block (mark:space) + CM_PWM clock | [pizero](https://github.com/jetpax/zephyr/tree/pizero) (zp staging branch pending) |
+| PWM | BCM283x PWM block (mark:space) + CM_PWM clock | [dev](https://github.com/jetpax/zephyr/tree/dev) (zp staging branch pending) |
+| SMP | spin-table boot + BCM2836 mailbox IPI + FPU sharing | [dev](https://github.com/jetpax/zephyr/tree/dev) (zp staging branch pending) |
 | Wi-Fi firmware blobs | **Bundled into `zephyr.bin`** at build time (via `hal_broadcom` + `west blobs fetch` from `rpi-distro/firmware-nonfree`). | [hal_broadcom](https://github.com/jetpax/hal_broadcom) |
 
 ## Rebuilding from source
@@ -254,38 +313,36 @@ Release binaries live on
 [Releases](https://github.com/jetpax/PiZZa/releases). To build your own:
 
 ```sh
-# 1. Bring up a Zephyr workspace per upstream docs
-west init -m https://github.com/zephyrproject-rtos/zephyr zephyrproject
+# 1. Bring up a Zephyr workspace on the fork's dev branch
+west init -m https://github.com/jetpax/zephyr --mr dev zephyrproject
 cd zephyrproject
+west update
 
-# 2. Switch to the staged board branch on the fork
-cd zephyr
-git remote add jetpax https://github.com/jetpax/zephyr.git
-git fetch jetpax
-git checkout jetpax/zp16-wifi-brcmfmac    # has every dependency in
+# 2. Fetch the Wi-Fi firmware blobs (hal_broadcom is in the fork's west.yml)
+west blobs fetch hal_broadcom
 
-# 3. Register hal_broadcom locally (until the upstream west.yml entry lands)
-cd ..
-git clone https://github.com/jetpax/hal_broadcom.git modules/hal/broadcom
-
-# 4. Fetch the firmware blobs
-EXTRA_ZEPHYR_MODULES="$PWD/modules/hal/broadcom" \
-  west blobs fetch hal_broadcom
-
-# 5. Build
+# 3. Build an app from this repo -- PizzaShell is the shell image
 source ~/.zephyr-venv/bin/activate
-EXTRA_ZEPHYR_MODULES="$PWD/modules/hal/broadcom" \
-  west build -p always -b rpi_zero_2w -s zephyr/samples/subsys/shell/shell_module
+export ZEPHYR_TOOLCHAIN_VARIANT=cross-compile
+export CROSS_COMPILE=$HOME/zephyr-sdk/aarch64-zephyr-elf/bin/aarch64-zephyr-elf-
+west build -p always -b rpi_zero_2w -s path/to/PiZZa/apps/PizzaShell
 ```
 
-When the upstream PRs land and `hal_broadcom` gets a `west.yml` entry,
-the `EXTRA_ZEPHYR_MODULES` dance goes away.
+The boot-menu entries are `apps/PiZZaBoot` (the menu itself),
+`apps/retro`, `apps/PizzaShell`, the
+[ArduinoCore-zephyr](https://github.com/jetpax/ArduinoCore-zephyr) `pizza`
+branch (built as `EXTRA_ZEPHYR_MODULES`, source dir `loader/`), and the
+MicroPython Zephyr port. Feed the five `zephyr.bin` files to
+`make-sdcard.sh --menu` as shown above.
+
+When the upstream PRs land, this becomes a stock `west init` against
+`zephyrproject-rtos/zephyr` and the fork drops out.
 
 ### Note on Wi-Fi firmware loading
 
 Currently both the upstream-bound build and the PiZZa-bound build
 compile the brcmfmac firmware into `zephyr.bin` via `hal_broadcom`
-(see step 3 above). A future runtime FS-load path would let
+(the blobs step above). A future runtime FS-load path would let
 `zephyr.bin` slim down by ~500 KB and read
 `brcmfmac43436s-sdio.{bin,txt}` from the SD filesystem instead — but
 that code is not yet in `zp16-wifi-brcmfmac`. Note: the firmware

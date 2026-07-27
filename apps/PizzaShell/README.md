@@ -1,10 +1,13 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # PizzaShell
 
-The default PiZZa image: an interactive shell over USB CDC ACM (Zero 2 W)
-or the mini-UART (Zero W), with a `pizza about` menu that reports SoC,
-memory, storage, HDMI, Wi-Fi and die temperature. One source, both boards.
-Contents of a stock `pizza-shell-*.img.xz` release.
+An interactive shell over USB CDC ACM (Zero 2 W) or the mini-UART (Zero W),
+with a `pizza about` menu that reports SoC, memory, storage, HDMI, Wi-Fi and
+die temperature. One source, both boards. Ships as the **PiZZa Shell** entry
+of the boot-menu image, and as the whole of a `pizza-shell-*.img.xz`.
+
+`boot list`, `boot <name>` and `boot menu` switch between boot-menu entries
+from here.
 
 The [top-level README](../../README.md) covers the flash / first-boot
 walk-through for a released image; the steps below are for rebuilding
@@ -26,6 +29,14 @@ west build -p always -b rpi_zero_2w \
 cd ~/github/SS/PiZZa
 ./install-to-sdcard.sh ~/zephyrproject/build-pizzashell-z2w/zephyr/zephyr.bin
 diskutil eject /Volumes/PIZZA
+```
+
+On a boot-menu card, name the slot instead — the installer refuses
+without it:
+
+```sh
+./install-to-sdcard.sh --slot "PiZZa Shell" \
+  ~/zephyrproject/build-pizzashell-z2w/zephyr/zephyr.bin
 ```
 
 Original Pi Zero W (32-bit ARMv6):

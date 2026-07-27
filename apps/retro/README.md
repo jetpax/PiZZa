@@ -47,6 +47,14 @@ cd ~/github/SS/PiZZa
 diskutil eject /Volumes/PIZZA
 ```
 
+RetroPiZZa is the default entry of the boot-menu image; on such a card
+name the slot instead (the installer refuses without it):
+
+```sh
+./install-to-sdcard.sh --slot RetroPiZZa \
+  ~/zephyrproject/build-retro-hw/zephyr/zephyr.bin
+```
+
 A core, e.g. Doom (produces `doom.llext`):
 
 ```sh

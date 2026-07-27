@@ -54,6 +54,11 @@ one-time setup, **Upload is one button: no SD swap, no manual re-flash.**
 
 That's the only time you touch the SD card from the host.
 
+> Already running a **PiZZa boot-menu card** (`pizza-menu-*.img.xz`)? The
+> loader is on it as the **Arduino** entry — pick that from the menu and
+> skip this step. To update just the loader on such a card, use
+> `./install-to-sdcard.sh --slot Arduino <loader zephyr.bin>`.
+
 
 ## Step 3 — Your first sketch
 
