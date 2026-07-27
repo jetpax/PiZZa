@@ -408,8 +408,16 @@ static void pizza_snapshot_storage(char *buf, size_t len)
 		return;
 	}
 
-	uint64_t total_bytes = (uint64_t)st.f_bsize * (uint64_t)st.f_blocks;
-	uint64_t free_bytes  = (uint64_t)st.f_bsize * (uint64_t)st.f_bfree;
+	/*
+	 * f_blocks and f_bfree are counts of ALLOCATION UNITS, not sectors:
+	 * Zephyr's FATFS backend fills them from f_getfree(), which counts
+	 * clusters. The byte multiplier is therefore f_frsize (the cluster
+	 * size), not f_bsize (the sector size) -- using f_bsize under-reports
+	 * by the sectors-per-cluster factor, which is how a 510 MiB card
+	 * showed up as 63 MiB at 8 sectors per cluster.
+	 */
+	uint64_t total_bytes = (uint64_t)st.f_frsize * (uint64_t)st.f_blocks;
+	uint64_t free_bytes  = (uint64_t)st.f_frsize * (uint64_t)st.f_bfree;
 	uint32_t total_mib   = (uint32_t)(total_bytes / (1024ULL * 1024ULL));
 	uint32_t free_mib    = (uint32_t)(free_bytes  / (1024ULL * 1024ULL));
 
