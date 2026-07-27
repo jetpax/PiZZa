@@ -57,7 +57,6 @@ static struct bootsel_entry entries[PB_MAX_ENTRIES];
 static int entry_count;
 static int menu_timeout_s = DEFAULT_TIMEOUT_S;
 static char default_name[PB_NAME_LEN];
-static char shell_file[PB_FILE_LEN];
 
 /* --- console mux ------------------------------------------------------------ */
 
@@ -66,7 +65,6 @@ enum key {
 	K_UP,
 	K_DOWN,
 	K_ENTER,
-	K_CMDLINE,		/* c: boot the "shell" kernel, GRUB-style */
 	K_OTHER,		/* any other key: cancels the countdown */
 	K_DIGIT_BASE = 100,	/* K_DIGIT_BASE + i = entry i */
 };
@@ -159,9 +157,6 @@ static enum key con_poll_key(struct con *c)
 		}
 		if (ch >= '1' && ch <= '9') {
 			return (enum key)(K_DIGIT_BASE + (ch - '1'));
-		}
-		if (ch == 'c' || ch == 'C') {
-			return K_CMDLINE;
 		}
 		/* 0x00/0xFF are power-on line glitches, not keys. */
 		if (ch == 0x00 || ch == 0xFF) {
@@ -344,13 +339,10 @@ static void render(int sel, const char *status)
 		con_puts("  no boot entries found\n");
 	}
 	con_puts("\nup/down + enter, or a digit. button: short=next, long=boot\n");
-	if (shell_file[0] != '\0') {
-		con_puts("press c for a command line\n");
-	}
 	if (status != NULL && status[0] != '\0') {
 		con_printf("%s\n", status);
 	}
-	hdmi_render(entries, entry_count, sel, shell_file[0] != '\0', status);
+	hdmi_render(entries, entry_count, sel, status);
 }
 
 /* --- launch ------------------------------------------------------------------ */
@@ -375,27 +367,6 @@ static void launch(int idx, char *status, size_t status_sz)
 
 	if (rc != 0) {
 		snprintf(status, status_sz, "chosen.txt write failed (%d)", rc);
-		return;
-	}
-	k_msleep(50);
-	bootsel_reboot();
-}
-
-static void launch_shell(int sel, char *status, size_t status_sz)
-{
-	char msg[64];
-
-	if (shell_file[0] == '\0') {
-		return;
-	}
-	snprintf(msg, sizeof(msg), "booting %s ...", shell_file);
-	render(sel, msg);
-
-	int rc = bootsel_set_kernel(shell_file);
-
-	if (rc != 0) {
-		snprintf(status, status_sz, "command line %s: error %d",
-			 shell_file, rc);
 		return;
 	}
 	k_msleep(50);
@@ -434,8 +405,7 @@ int main(void)
 
 	entry_count = bootsel_load_menu(entries, PB_MAX_ENTRIES,
 					&menu_timeout_s, default_name,
-					sizeof(default_name),
-					shell_file, sizeof(shell_file));
+					sizeof(default_name));
 	if (entry_count == 0) {
 		entry_count = scan_bins();
 	}
@@ -522,11 +492,6 @@ int main(void)
 		case K_ENTER:
 			status[0] = '\0';
 			launch(sel, status, sizeof(status));
-			render(sel, status);
-			break;
-		case K_CMDLINE:
-			status[0] = '\0';
-			launch_shell(sel, status, sizeof(status));
 			render(sel, status);
 			break;
 		default:

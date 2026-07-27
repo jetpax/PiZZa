@@ -109,22 +109,8 @@ if [ "${MENU_MODE}" = 1 ]; then
 	}
 	cp "${BOOTMENU_BIN}" "${WORK}/bootmenu.bin"
 
-	# An entry literally named "shell" is not a list entry: it becomes
-	# the menu.txt "shell" key -- the kernel behind PiZZaBoot's `c`
-	# (command line) key, GRUB-style. The default is the first
-	# non-shell entry.
-	DEFAULT_NAME=""
-	for name in "${ENTRY_NAMES[@]}"; do
-		lc="$(printf '%s' "${name}" | tr '[:upper:]' '[:lower:]')"
-		if [ "${lc}" != "shell" ]; then
-			DEFAULT_NAME="${name}"
-			break
-		fi
-	done
-	[ -n "${DEFAULT_NAME}" ] || {
-		echo "error: --menu needs at least one non-shell entry" >&2
-		exit 1
-	}
+	# Every entry is a list entry; the first one is the default.
+	DEFAULT_NAME="${ENTRY_NAMES[0]}"
 
 	{
 		echo "timeout = 5"
@@ -137,11 +123,7 @@ if [ "${MENU_MODE}" = 1 ]; then
 		path="${ENTRY_PATHS[$i]}"
 		[ -f "${path}" ] || { echo "error: not found: ${path}" >&2; exit 1; }
 		lc="$(printf '%s' "${name}" | tr '[:upper:]' '[:lower:]')"
-		if [ "${lc}" = "shell" ]; then
-			slug="shell"
-		else
-			slug="$(printf '%s' "${lc}" | tr -cd 'a-z0-9')"
-		fi
+		slug="$(printf '%s' "${lc}" | tr -cd 'a-z0-9')"
 		[ -n "${slug}" ] || {
 			echo "error: entry name '${name}' has no usable characters" >&2
 			exit 1
@@ -151,11 +133,7 @@ if [ "${MENU_MODE}" = 1 ]; then
 			exit 1
 		}
 		cp "${path}" "${WORK}/${slug}.bin"
-		if [ "${lc}" = "shell" ]; then
-			echo "shell = shell.bin" >> "${WORK}/menu.txt"
-		else
-			echo "${name} = ${slug}.bin" >> "${WORK}/menu.txt"
-		fi
+		echo "${name} = ${slug}.bin" >> "${WORK}/menu.txt"
 		i=$((i + 1))
 	done
 

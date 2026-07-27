@@ -43,17 +43,14 @@ int bootsel_set_kernel(const char *file);
 
 /*
  * Parse menu.txt at the boot FAT root ("Name = file.bin" lines;
- * "timeout" / "default" / "shell" keys are reserved) and fs_stat each
- * entry's kernel file into .present. timeout_s / def_name /
- * shell_file are written only when the corresponding key is present
- * (pass NULL to skip). "shell" names the kernel behind PiZZaBoot's
- * `c` (command line) key, GRUB-style -- not a list entry. Returns the
- * entry count, 0 if menu.txt is absent or empty. Not thread-safe
+ * "timeout" and "default" keys are reserved) and fs_stat each entry's
+ * kernel file into .present. timeout_s / def_name are written only
+ * when the corresponding key is present (pass NULL to skip). Returns
+ * the entry count, 0 if menu.txt is absent or empty. Not thread-safe
  * (static parse buffer).
  */
 int bootsel_load_menu(struct bootsel_entry *ents, int max,
-		      int *timeout_s, char *def_name, size_t def_sz,
-		      char *shell_file, size_t shell_sz);
+		      int *timeout_s, char *def_name, size_t def_sz);
 
 /* First line of chosen.txt into buf. Returns 0 or a negative error. */
 int bootsel_get_chosen(char *buf, size_t sz);

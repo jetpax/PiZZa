@@ -156,8 +156,7 @@ static bool str_ieq(const char *a, const char *b)
 }
 
 int bootsel_load_menu(struct bootsel_entry *ents, int max,
-		      int *timeout_s, char *def_name, size_t def_sz,
-		      char *shell_file, size_t shell_sz)
+		      int *timeout_s, char *def_name, size_t def_sz)
 {
 	static char buf[2048];
 	struct fs_file_t f;
@@ -203,13 +202,6 @@ int bootsel_load_menu(struct bootsel_entry *ents, int max,
 			if (def_name != NULL && def_sz > 0) {
 				strncpy(def_name, val, def_sz - 1);
 				def_name[def_sz - 1] = '\0';
-			}
-			continue;
-		}
-		if (str_ieq(key, "shell")) {
-			if (shell_file != NULL && shell_sz > 0) {
-				strncpy(shell_file, val, shell_sz - 1);
-				shell_file[shell_sz - 1] = '\0';
 			}
 			continue;
 		}
@@ -305,8 +297,7 @@ int bootsel_menu(void)
 int bootsel_boot(const char *name_or_file)
 {
 	struct bootsel_entry ents[BOOTSEL_MAX_ENTRIES];
-	int n = bootsel_load_menu(ents, BOOTSEL_MAX_ENTRIES, NULL, NULL, 0,
-				  NULL, 0);
+	int n = bootsel_load_menu(ents, BOOTSEL_MAX_ENTRIES, NULL, NULL, 0);
 	const char *file = name_or_file;
 
 	for (int i = 0; i < n; i++) {

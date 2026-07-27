@@ -66,14 +66,13 @@ static int cmd_boot_list(const struct shell *sh, size_t argc, char **argv)
 	struct bootsel_entry ents[BOOTSEL_MAX_ENTRIES];
 	char chosen[64] = "";
 	char def[BOOTSEL_NAME_LEN] = "";
-	char shellk[BOOTSEL_FILE_LEN] = "";
 	int timeout_s = -1;
 
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
 	int n = bootsel_load_menu(ents, BOOTSEL_MAX_ENTRIES, &timeout_s,
-				  def, sizeof(def), shellk, sizeof(shellk));
+				  def, sizeof(def));
 
 	if (n == 0) {
 		shell_print(sh, "no menu.txt on the boot FAT");
@@ -91,9 +90,6 @@ static int cmd_boot_list(const struct shell *sh, size_t argc, char **argv)
 				    '*' : ' ',
 			    ents[i].name, ents[i].file,
 			    ents[i].present ? "" : " (missing)");
-	}
-	if (shellk[0] != '\0') {
-		shell_print(sh, "  %-24s %-20s", "command line (c)", shellk);
 	}
 	if (chosen[0] == '\0') {
 		shell_print(sh, "(no choice persisted: menu boots)");

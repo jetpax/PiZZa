@@ -109,7 +109,7 @@ int hdmi_init(void)
 }
 
 void hdmi_render(const struct bootsel_entry *ents, int n, int sel,
-		 bool have_shell, const char *status)
+		 const char *status)
 {
 	if (!hdmi_ok) {
 		return;
@@ -171,10 +171,6 @@ void hdmi_render(const struct bootsel_entry *ents, int n, int sel,
 		  1, COL_HELP);
 	draw_text(box_x + 8, hy + 48,
 		  "selected image.", 1, COL_HELP);
-	if (have_shell) {
-		draw_text(box_x + 8, hy + 68,
-			  "Press c for a command line.", 1, COL_HELP);
-	}
 
 	if (status != NULL && status[0] != '\0') {
 		draw_text(box_x + 8, FB_H - 30, status, 1, COL_TEXT);

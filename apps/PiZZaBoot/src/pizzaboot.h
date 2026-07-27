@@ -14,11 +14,9 @@
 #define PB_NAME_LEN    BOOTSEL_NAME_LEN
 #define PB_FILE_LEN    BOOTSEL_FILE_LEN
 
-/* HDMI list renderer (hdmi.c). status may be NULL; have_shell shows
- * the "Press c for a command line" help line.
- */
+/* HDMI list renderer (hdmi.c). status may be NULL. */
 int hdmi_init(void);
 void hdmi_render(const struct bootsel_entry *ents, int n, int sel,
-		 bool have_shell, const char *status);
+		 const char *status);
 
 #endif /* PIZZABOOT_H_ */
