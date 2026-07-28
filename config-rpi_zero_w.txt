@@ -15,3 +15,13 @@ disable_commandline_tags=1
 # is the core clock, unlike PL011). PL011 is left on the Bluetooth modem.
 enable_uart=1
 core_freq=250
+
+# Bring HDMI up at boot even with no monitor attached at power-on.
+# Without this, hot-plugging later leaves the pipeline cold and the
+# framebuffer driver's ALLOCATE_BUFFER returns an empty buffer.
+# Harmless when HDMI isn't used.
+hdmi_force_hotplug=1
+
+# Hand the whole panel to the framebuffer; the firmware's default
+# overscan compensation insets 48 px on every side.
+disable_overscan=1

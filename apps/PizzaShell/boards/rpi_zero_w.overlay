@@ -1,8 +1,9 @@
 /*
- * PiZZa -- USB-CDC overlay for rpi_zero_w.
+ * PiZZa -- USB-CDC + HDMI overlay for rpi_zero_w.
  *
- * Enables the VC mailbox + firmware (needed to power-on the USB PHY)
- * and the DWC2 USB controller with a CDC ACM child for the shell.
+ * Enables the VC mailbox + firmware (needed to power-on the USB PHY
+ * and to allocate the framebuffer), the DWC2 USB controller with a
+ * CDC ACM child for the shell, and the VC framebuffer on HDMI.
  * Boot logs + LOG_* remain on the AUX mini-UART (uart1, set up by
  * the board DTS at 115200 on GPIO 14/15).
  */
@@ -41,4 +42,27 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pwm_gpio12>;
 	status = "okay";
+};
+
+/*
+ * HDMI framebuffer. VC owns the HDMI block and scans this buffer out
+ * continuously; the ARM side asks for it at runtime over the mailbox
+ * property channel. &dma drives the backbuffer blit.
+ */
+&dma {
+	status = "okay";
+};
+
+&vc_fb {
+	/* No width / height: driver auto-detects from VC's EDID
+	 * negotiation -- whatever the attached monitor's native mode is,
+	 * matching the Zero 2 W overlay.
+	 */
+	status = "okay";
+};
+
+/ {
+	chosen {
+		zephyr,display = &vc_fb;
+	};
 };

@@ -70,7 +70,7 @@ out of scope. Legend: ✅ enabled · 🚧 planned · ❌ not planned · — N/A.
 | Mini-UART @ 115200 on GPIO 14/15 | ✅ | fallback, default config.txt |
 | PL011 @ 1 Mbaud | ✅ | advanced; needs config.txt + DTS rebuild |
 | **Display / Camera** | | |
-| HDMI | ✅ | Framebuffer with EDID / mode auto-detect |
+| HDMI | ✅ | Framebuffer with EDID / mode auto-detect, both boards |
 | MIPI DSI display | ❌ | not planned |
 | MIPI CSI camera | ❌ | not planned |
 | Composite video | ❌ | not planned |
@@ -88,7 +88,7 @@ out of scope. Legend: ✅ enabled · 🚧 planned · ❌ not planned · — N/A.
 | Board | Supported? | Notes |
 | --- | --- | --- |
 | **Raspberry Pi Zero 2 W** | ✅ Yes — the target | Tested. BCM2710A1, Cortex-A53 quad, CYW43439 SDIO Wi-Fi. |
-| **Original Raspberry Pi Zero W** | ✅ Yes | BCM2835, single-core ARM1176JZF-S (ARMv6, 32-bit, AArch32). USB-CDC console, SD storage, and (as of Arduino v0.5.0) on-module BCM43430A1 Wi-Fi all working — the loader downloads the CLM regulatory blob the trim-on-build firmware ships without. Sensor bring-up pending. The original Pi Zero (no Wi-Fi) is the same SoC and should work but is untested. |
+| **Original Raspberry Pi Zero W** | ✅ Yes | BCM2835, single-core ARM1176JZF-S (ARMv6, 32-bit, AArch32). USB-CDC console, SD storage, HDMI (EDID mode auto-detect, same VideoCore framebuffer driver as the 2 W), and (as of Arduino v0.5.0) on-module BCM43430A1 Wi-Fi all working — the loader downloads the CLM regulatory blob the trim-on-build firmware ships without. Sensor bring-up pending, and there is no boot-menu card for this board yet. The original Pi Zero (no Wi-Fi) is the same SoC and should work but is untested. |
 | **Raspberry Pi 3 / 3B / 3B+** | ⚠️ Possibly — **untested** | Same Pi 3 / BCM27xx family (BCM2837), same Cortex-A53. Likely needs config tweaks for the different Wi-Fi part (BCM43438 vs CYW43439 → different firmware blob), Ethernet PHY, and HAT pin layout. Open an issue if you try it. |
 | **Raspberry Pi 4 / 5** | ❌ No | BCM2711 / BCM2712, GIC-based, different MMIO base; uses the upstream [`rpi_4b`](https://docs.zephyrproject.org/latest/boards/raspberrypi/rpi_4b/doc/index.html) / `rpi_5` boards. |
 | **Raspberry Pi Pico / Pico 2 (RP2040 / RP2350)** | ❌ No | Different SoC family entirely. |
