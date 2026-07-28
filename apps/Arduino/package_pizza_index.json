@@ -10,23 +10,23 @@
       },
       "platforms": [
         {
-          "name": "PiZZA Boards (Pi Zero on Zephyr with Arduino)",
+          "name": "PiZZa Boards (Pi Zero on Zephyr with Arduino)",
           "architecture": "zephyr",
-          "version": "0.6.2",
+          "version": "0.6.3",
           "category": "Contributed",
           "help": {
             "online": "https://github.com/jetpax/PiZZa#readme"
           },
-          "url": "https://github.com/jetpax/PiZZa/releases/download/arduino-core-v0.6.2/ArduinoCore-pizza-0.6.2.tar.bz2",
-          "archiveFileName": "ArduinoCore-pizza-0.6.2.tar.bz2",
-          "checksum": "SHA-256:f2339e1973c857c1d3cc23a958150d9f4ebb3822450b17a0040ac7a394029449",
-          "size": "10691954",
+          "url": "https://github.com/jetpax/PiZZa/releases/download/arduino-core-v0.6.3/ArduinoCore-pizza-0.6.3.tar.bz2",
+          "archiveFileName": "ArduinoCore-pizza-0.6.3.tar.bz2",
+          "checksum": "SHA-256:316f7e314bed544a567f5e22da8b66ef48df16f24f1aeb98ab9077b7561653ba",
+          "size": "10716339",
           "boards": [
             {
-              "name": "PiZZa (Raspberry Pi Zero 2 W)"
+              "name": "PiZZa RPi Zero 2 W (BCM2710)"
             },
             {
-              "name": "PiZZa (Raspberry Pi Zero W)"
+              "name": "PiZZa RPi Zero W (BCM2835)"
             }
           ],
           "toolsDependencies": [
