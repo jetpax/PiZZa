@@ -151,9 +151,10 @@ no menu and no added boot time. Hold GPIO 17 low at power-on to force the
 menu back. A fresh card ships no `chosen.txt`, so first boot always shows
 the menu, with a five-second countdown to RetroPiZZa.
 
-The original **Pi Zero W** gets a two-entry card — **PiZZa Shell** and
-**Arduino** — driven by the same menu. The games and emulators are Zero
-2 W only; on a single ARMv6 core most would not be worth running.
+The original **Pi Zero W** gets a three-entry card — **PiZZa Shell**,
+**Arduino** and **MicroPython** — driven by the same menu. The games and
+emulators are Zero 2 W only; on a single ARMv6 core most would not be
+worth running.
 
 To image a card from a local build instead, use the builder at the repo
 root (Docker, loop-free, works the same on macOS and Linux):
