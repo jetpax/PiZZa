@@ -307,6 +307,19 @@ PWM work. It bundles:
 | SMP | spin-table boot + BCM2836 mailbox IPI + FPU sharing | [dev](https://github.com/jetpax/zephyr/tree/dev) (zp staging branch pending) |
 | Wi-Fi firmware blobs | **Bundled into `zephyr.bin`** at build time (via `hal_broadcom` + `west blobs fetch` from `rpi-distro/firmware-nonfree`). | [hal_broadcom](https://github.com/jetpax/hal_broadcom) |
 
+## Version numbers
+
+Two things here are versioned separately:
+
+| Tag | Versions |
+| --- | --- |
+| `pizza-vX.Y.Z` | the distribution — the card image and everything on it |
+| `arduino-core-vX.Y.Z`, `arduino-loader-vX.Y.Z` | the [Arduino board package](apps/Arduino/README.md) in Boards Manager, and its standalone loader image |
+
+Boards Manager tracks the Arduino core on its own cadence, so the two
+lines move independently. PiZZa is numbered above the core so the newest
+number on the Releases page is always the distribution.
+
 ## Rebuilding from source
 
 Release binaries live on
