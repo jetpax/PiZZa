@@ -2,9 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 #
-# Build a flashable single-FAT32 SD image for any PiZZa Zephyr app --
-# the same way the Arduino loader images are built (and unlike them,
-# board-parameterised). The Pi boots a Zephyr kernel straight from a
+# Build a flashable single-FAT32 SD image for any PiZZa Zephyr app.
+# The Pi boots a Zephyr kernel straight from a
 # FAT boot partition, so the image is just: the Raspberry Pi boot
 # blobs + config.txt + the app (zephyr.bin) + optional payload files
 # (game assets, disk images). Flash the result with Raspberry Pi
@@ -41,7 +40,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 # raspberrypi/firmware commit the boot blobs are pinned to (reproducible
-# builds; same pin as apps/Arduino/loader-image).
+# builds).
 FW_PIN="afc8dbd74865c6d367dba5505c5a863252588ca8"
 
 BOARD="${1:?usage: $0 <rpi_zero_2w|rpi_zero_w> <zephyr.bin>|--menu <bootmenu.bin> <Name=path...> [-o out.img] [-s size_mb] [payload...]}"

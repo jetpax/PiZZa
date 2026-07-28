@@ -332,11 +332,15 @@ Two things here are versioned separately:
 | Tag | Versions |
 | --- | --- |
 | `pizza-vX.Y.Z` | the distribution — the card image and everything on it |
-| `arduino-core-vX.Y.Z`, `arduino-loader-vX.Y.Z` | the [Arduino board package](apps/Arduino/README.md) in Boards Manager, and its standalone loader image |
+| `arduino-core-vX.Y.Z` | the [Arduino board package](apps/Arduino/README.md) in Boards Manager |
 
 Boards Manager tracks the Arduino core on its own cadence, so the two
 lines move independently. PiZZa is numbered above the core so the newest
 number on the Releases page is always the distribution.
+
+The Arduino loader has no version line of its own: it ships as the
+**Arduino** entry on the standard card, so it is versioned with the
+distribution like every other entry.
 
 ## Rebuilding from source
 

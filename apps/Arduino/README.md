@@ -41,23 +41,31 @@ one-time setup, **Upload is one button: no SD swap, no manual re-flash.**
 3. **Tools → Board → PiZZa (Raspberry Pi Zero 2 W)** *or* **PiZZa (Raspberry
    Pi Zero W)**, matching the board you're plugging in.
 
-## Step 2 — Flash the loader to the SD card (one time)
+## Step 2 — Flash the PiZZa card (one time)
 
-1. Download the ready-to-flash loader image for your board:
-   - **Pi Zero 2 W:** [pizza-loader-rpi_zero_2w-v0.5.0.img.xz](https://github.com/jetpax/PiZZa/releases/download/arduino-loader-v0.5.0/pizza-loader-rpi_zero_2w-v0.5.0.img.xz)
-   - **Pi Zero W (original):** [pizza-loader-rpi_zero_w-v0.5.0.img.xz](https://github.com/jetpax/PiZZa/releases/download/arduino-loader-v0.5.0/pizza-loader-rpi_zero_w-v0.5.0.img.xz)
+The Arduino loader ships as one entry on the standard PiZZa card, so
+there is no separate Arduino image to install.
 
-   Both are ~2 MB; SHAs on the [release page](https://github.com/jetpax/PiZZa/releases/tag/arduino-loader-v0.5.0).
+1. Download the boot-menu image for your board from
+   [PiZZa Releases](https://github.com/jetpax/PiZZa/releases):
+   - **Pi Zero 2 W:** `pizza-menu-rpi_zero_2w-*.img.xz`
+   - **Pi Zero W (original):** `pizza-menu-rpi_zero_w-*.img.xz`
 2. Flash with **Raspberry Pi Imager** (*Choose OS → Use custom* → pick the
-   `.img.xz`) or balenaEtcher — both read `.img.xz` directly, no unzip needed.
-3. Put the card in the Pi.
+   `.img.xz`) or balenaEtcher — both read `.img.xz` directly, no unzip
+   needed. `./flash-sdcard.sh <image>` does the same from a terminal.
+3. Put the card in the Pi and power up. The boot menu appears; choose
+   **Arduino**.
 
-That's the only time you touch the SD card from the host.
+Your choice is remembered, so from then on the Pi boots straight into the
+loader. Hold a button between **GPIO 17 and GND** at power-on to get the
+menu back and switch to something else.
 
-> Already running a **PiZZa boot-menu card** (`pizza-menu-*.img.xz`)? The
-> loader is on it as the **Arduino** entry — pick that from the menu and
-> skip this step. To update just the loader on such a card, use
-> `./install-to-sdcard.sh --slot Arduino <loader zephyr.bin>`.
+That's the only time you touch the SD card from the host. To update just
+the loader later, without re-imaging:
+
+```sh
+./install-to-sdcard.sh --slot Arduino <loader zephyr.bin>
+```
 
 
 ## Step 3 — Your first sketch
