@@ -42,7 +42,7 @@ without it:
 Original Pi Zero W (32-bit ARMv6):
 
 ```sh
-export CROSS_COMPILE=$HOME/zephyr-sdk/arm-zephyr-eabi/bin/arm-zephyr-eabi-
+export CROSS_COMPILE=$HOME/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-
 west build -p always -b rpi_zero_w \
   -s ~/github/SS/PiZZa/apps/PizzaShell -d build-pizzashell-zw
 ./install-to-sdcard.sh rpi_zero_w ~/zephyrproject/build-pizzashell-zw/zephyr/zephyr.bin
