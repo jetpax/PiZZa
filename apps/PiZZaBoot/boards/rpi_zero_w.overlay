@@ -1,0 +1,75 @@
+/*
+ * PiZZaBoot -- rpi_zero_w overlay.
+ *
+ * Menu console on the mini-UART (GPIO14/15 @ 115200, per the canonical
+ * config.txt enable_uart=1), mirrored on USB CDC ACM. HDMI list drawn
+ * into a 640x480 virtual framebuffer that the VideoCore HVS upscales
+ * to the monitor's native mode (render-width/render-height) -- the
+ * same arrangement as the Zero 2 W, and it keeps the framebuffer at
+ * 1.2 MB so the default 8 MiB kernel VM window is ample.
+ *
+ * Unlike the Zero 2 W, &sdhost is disabled in the SoC DTS and needs
+ * its ALT0 mux (GPIO 48..53) named here.
+ */
+
+&mbox0 {
+	status = "okay";
+};
+
+&firmware {
+	status = "okay";
+};
+
+&vc_fb {
+	render-width = <640>;
+	render-height = <480>;
+	status = "okay";
+};
+
+&usb {
+	status = "okay";
+
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+		label = "PiZZaBoot menu (USB CDC ACM)";
+	};
+};
+
+/* Legacy SDHost controller -> external microSD slot, which carries the
+ * boot FAT this menu reads menu.txt and chosen.txt from.
+ */
+&sdhost {
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdhost_gpio48>;
+	status = "okay";
+
+	sdmmc {
+		compatible = "zephyr,sdmmc-disk";
+		disk-name = "SD";
+	};
+};
+
+/ {
+	fstab {
+		compatible = "zephyr,fstab";
+
+		sd_fs: sd {
+			compatible = "zephyr,fstab,fatfs";
+			automount;
+			disk-access;
+			mount-point = "/SD:";
+		};
+	};
+
+	chosen {
+		zephyr,console = &uart1;
+		zephyr,display = &vc_fb;
+	};
+};
+
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1_gpio14>;
+	status = "okay";
+	current-speed = <115200>;
+};
