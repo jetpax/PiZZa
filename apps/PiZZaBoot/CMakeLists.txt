@@ -16,4 +16,4 @@ target_sources(app PRIVATE
   src/hdmi.c
   ../lib/bootsel/bootsel.c
 )
-target_include_directories(app PRIVATE ../lib/bootsel)
+target_include_directories(app PRIVATE ../lib ../lib/bootsel)

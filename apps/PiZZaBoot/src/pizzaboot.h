@@ -7,8 +7,7 @@
 #define PIZZABOOT_H_
 
 #include "bootsel.h"
-
-#define PIZZABOOT_VERSION "0.1"
+#include "pizza_version.h"
 
 #define PB_MAX_ENTRIES BOOTSEL_MAX_ENTRIES
 #define PB_NAME_LEN    BOOTSEL_NAME_LEN

@@ -51,7 +51,7 @@
 #include <zephyr/net/wifi_mgmt.h>
 #endif
 
-#define PIZZA_VERSION "v0.4.1"
+#include "pizza_version.h"
 
 /* Per-board identity + the static "info" lines. */
 #if defined(CONFIG_SOC_BCM2835)
@@ -83,7 +83,7 @@
 #endif
 
 #define BANNER_TITLE \
-	"\x1b[1;32mPiZZa " PIZZA_VERSION " -- Zephyr v" KERNEL_VERSION_STRING \
+	"\x1b[1;32mPiZZa v" PIZZA_VERSION " -- Zephyr v" KERNEL_VERSION_STRING \
 	" on " PIZZA_BOARD_NAME "\x1b[0m\r\n"
 #define BANNER_HELP "Type 'help' for more information.\r\n"
 

@@ -129,7 +129,7 @@ void hdmi_render(const struct bootsel_entry *ents, int n, int sel,
 		fb[i] = COL_BG;
 	}
 
-	draw_text(box_x, 14, "PiZZaBoot  version " PIZZABOOT_VERSION, 2,
+	draw_text(box_x, 14, "PiZZaBoot  version " PIZZA_VERSION, 2,
 		  COL_TEXT);
 
 	fill_rect(box_x, box_y, box_w, 2, COL_TEXT);

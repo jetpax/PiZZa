@@ -18,4 +18,4 @@ target_sources(app PRIVATE
   ../lib/bootsel/bootsel.c
   ../lib/bootsel/bootsel_shell.c
 )
-target_include_directories(app PRIVATE ../lib/bootsel)
+target_include_directories(app PRIVATE ../lib ../lib/bootsel)
