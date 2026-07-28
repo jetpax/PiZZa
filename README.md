@@ -119,6 +119,20 @@ with [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
 a single FAT32 boot partition carrying the pinned Raspberry Pi boot
 blobs, `config.txt`, and the Zephyr apps.
 
+`flash-sdcard.sh` does the same job from a terminal, taking either a
+`.img` or a `.img.xz` and verifying the card by reading it back:
+
+```sh
+./flash-sdcard.sh pizza-menu-rpi_zero_2w-v0.7.0.img.xz
+./flash-sdcard.sh pizza-menu-rpi_zero_2w-v0.7.0.img.xz /dev/disk6
+```
+
+With no device it lists the removable candidates and writes nothing. It
+refuses partitions, internal disks, the disk backing `/`, and anything
+over 128 GB — an external backup drive is otherwise indistinguishable
+from a card — and it makes you retype the disk identifier before it
+touches anything.
+
 The stock image carries four apps and a boot menu:
 
 | Entry | What it is |

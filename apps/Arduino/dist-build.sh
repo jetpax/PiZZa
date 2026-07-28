@@ -32,7 +32,10 @@ ZEPHYR_WS="${HOME}/zephyrproject"
 ACZ="${HOME}/github/SS/ArduinoCore-zephyr"
 HAL_BROADCOM="${ZEPHYR_WS}/modules/hal/broadcom"
 
-export ZEPHYR_BASE="${ZEPHYR_WS}/zephyr"
+# Release loaders build from the `dev` worktree -- the branch that carries
+# every zp staging branch plus the SMP and PWM work. Override to build
+# against another worktree.
+export ZEPHYR_BASE="${ZEPHYR_BASE:-${ZEPHYR_WS}/zephyr-dev}"
 export EXTRA_ZEPHYR_MODULES="${HAL_BROADCOM};${ACZ}"
 
 # shellcheck disable=SC1091
@@ -49,7 +52,10 @@ BOARDS=(
 	"pizza_zero_w|rpi_zero_w_bcm2835|rpi_zero_w/bcm2835|${HOME}/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-"
 )
 
-# Filter by CLI arg if provided
+# Filter by CLI arg if provided. ALL_BOARDS keeps the full table:
+# boards.local.txt is regenerated from it (step 6), so a filtered
+# build doesn't clobber the other board's entries.
+ALL_BOARDS=("${BOARDS[@]}")
 if [ $# -gt 0 ]; then
 	filter="$1"
 	FILTERED=()
@@ -155,9 +161,12 @@ cat > boards.local.txt <<HDR
 
 HDR
 
-for row in "${BOARDS[@]}"; do
+for row in "${ALL_BOARDS[@]}"; do
 	IFS='|' read -r board variant target cross <<< "${row}"
 	VARIANT_DIR="${ACZ}/variants/${variant}"
+	# A filtered run still emits every board whose artifacts exist on
+	# disk from an earlier build; skip boards never built here.
+	[ -f "firmwares/zephyr-${variant}.config" ] || continue
 	# SD-based loaders (CONFIG_ARDUINO_SKETCH_LOADER_FS=y) don't emit
 	# _sketch_start / _sketch_max_size -- those are for flash-partition
 	# loaders. Only emit those upload fields if the symbols exist.
