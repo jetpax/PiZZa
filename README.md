@@ -123,8 +123,8 @@ blobs, `config.txt`, and the Zephyr apps.
 `.img` or a `.img.xz` and verifying the card by reading it back:
 
 ```sh
-./flash-sdcard.sh pizza-menu-rpi_zero_2w-v0.7.0.img.xz
-./flash-sdcard.sh pizza-menu-rpi_zero_2w-v0.7.0.img.xz /dev/disk6
+./flash-sdcard.sh pizza-menu-rpi_zero_2w-v0.7.1.img.xz
+./flash-sdcard.sh pizza-menu-rpi_zero_2w-v0.7.1.img.xz /dev/disk6
 ```
 
 With no device it lists the removable candidates and writes nothing. It
