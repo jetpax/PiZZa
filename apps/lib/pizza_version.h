@@ -15,6 +15,6 @@
 #ifndef PIZZA_VERSION_H_
 #define PIZZA_VERSION_H_
 
-#define PIZZA_VERSION "0.7.0"
+#define PIZZA_VERSION "0.7.1"
 
 #endif /* PIZZA_VERSION_H_ */
