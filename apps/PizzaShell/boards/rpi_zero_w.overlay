@@ -66,3 +66,44 @@
 		zephyr,display = &vc_fb;
 	};
 };
+
+/*
+ * External microSD through the SDHost controller, GPIO 48..53 in ALT0
+ * via the sdhost_gpio48 group. bcm2835.dtsi leaves the node disabled
+ * and no board DTS turns it on, so the app has to; the pinctrl state
+ * and the sdmmc child mirror the Arduino rpi_zero_w variant, which is
+ * where this recipe was proven.
+ *
+ * Note this is the card the board boots from. The Zero W has a single
+ * FAT partition, so what appears at /SD: is the live boot volume with
+ * config.txt and the kernels on it, mounted read-write. `fs rm` from
+ * the shell can make the card unbootable.
+ */
+&sdhost {
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdhost_gpio48>;
+	status = "okay";
+
+	sdmmc {
+		compatible = "zephyr,sdmmc-disk";
+		disk-name = "SD";
+	};
+};
+
+/*
+ * Automount at /SD: so `fs ls /SD:` and the `pizza` storage line work
+ * as soon as the shell is up. Format-on-mount-failure is off in the
+ * board .conf, so a card that fails to mount is never erased.
+ */
+/ {
+	fstab {
+		compatible = "zephyr,fstab";
+
+		sd_fs: sd {
+			compatible = "zephyr,fstab,fatfs";
+			automount;
+			disk-access;
+			mount-point = "/SD:";
+		};
+	};
+};
