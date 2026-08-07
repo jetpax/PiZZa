@@ -57,13 +57,17 @@ else
 	shift
 fi
 
+# The firmware picks its device tree from the board revision word, so a
+# card must carry every DTB the boards it targets can ask for. The
+# original Pi Zero (no Wi-Fi) is the same BCM2835 as the Zero W but asks
+# for bcm2708-rpi-zero.dtb, so rpi_zero_w cards ship both.
 case "${BOARD}" in
 rpi_zero_2w)
-	DTB="bcm2710-rpi-zero-2-w.dtb"
+	DTBS="bcm2710-rpi-zero-2-w.dtb"
 	CONFIG="${HERE}/config.txt"
 	;;
 rpi_zero_w)
-	DTB="bcm2708-rpi-zero-w.dtb"
+	DTBS="bcm2708-rpi-zero-w.dtb bcm2708-rpi-zero.dtb"
 	CONFIG="${HERE}/config-rpi_zero_w.txt"
 	;;
 *)
@@ -159,15 +163,15 @@ for f in "${PAYLOAD[@]+"${PAYLOAD[@]}"}"; do
 	cp "$f" "${WORK}/"
 done
 
-export FW_PIN SIZE_MB OUT DTB
-docker run --rm -e FW_PIN -e SIZE_MB -e OUT -e DTB \
+export FW_PIN SIZE_MB OUT DTBS
+docker run --rm -e FW_PIN -e SIZE_MB -e OUT -e DTBS \
 	-v "${HERE}/blobs:/blobs" -v "${WORK}:/work" -w /work ubuntu:22.04 bash -euc '
 	export DEBIAN_FRONTEND=noninteractive
 	apt-get update -qq >/dev/null
 	apt-get install -y -qq mtools dosfstools fdisk curl ca-certificates >/dev/null
 
 	# Pi boot blobs (cached in blobs/ between runs).
-	for f in bootcode.bin start.elf fixup.dat "$DTB" ; do
+	for f in bootcode.bin start.elf fixup.dat $DTBS ; do
 		[ -s "/blobs/$f" ] || curl -fsSL -o "/blobs/$f" \
 			"https://raw.githubusercontent.com/raspberrypi/firmware/${FW_PIN}/boot/${f}"
 	done
@@ -180,8 +184,10 @@ docker run --rm -e FW_PIN -e SIZE_MB -e OUT -e DTB \
 	# Format + populate the partition via mtools (offset = 2048 * 512).
 	OFF=$((2048 * 512))
 	mformat -i "${OUT}@@${OFF}" -F -v PIZZA ::
+	DTB_PATHS=""
+	for f in $DTBS ; do DTB_PATHS="${DTB_PATHS} /blobs/$f" ; done
 	mcopy -i "${OUT}@@${OFF}" /blobs/bootcode.bin /blobs/start.elf /blobs/fixup.dat \
-		"/blobs/$DTB" config.txt ::
+		$DTB_PATHS config.txt ::
 	for f in *; do
 		case "$f" in "$OUT"|config.txt) continue ;; esac
 		mcopy -i "${OUT}@@${OFF}" "$f" "::$f"
