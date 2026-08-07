@@ -88,7 +88,7 @@ out of scope. Legend: ✅ enabled · 🚧 planned · ❌ not planned · — N/A.
 | Board | Supported? | Notes |
 | --- | --- | --- |
 | **Raspberry Pi Zero 2 W** | ✅ Yes — the target | Tested. BCM2710A1, Cortex-A53 quad, CYW43439 SDIO Wi-Fi. |
-| **Original Raspberry Pi Zero W** | ✅ Yes | BCM2835, single-core ARM1176JZF-S (ARMv6, 32-bit, AArch32). USB-CDC console, SD storage, HDMI (EDID mode auto-detect, same VideoCore framebuffer driver as the 2 W), and (as of Arduino v0.5.0) on-module BCM43430A1 Wi-Fi all working — the loader downloads the CLM regulatory blob the trim-on-build firmware ships without. Sensor bring-up pending. The original Pi Zero (no Wi-Fi) is the same SoC and should work but is untested. |
+| **Original Raspberry Pi Zero W** | ✅ Yes | BCM2835, single-core ARM1176JZF-S (ARMv6, 32-bit, AArch32). USB-CDC console, SD storage, HDMI (EDID mode auto-detect, same VideoCore framebuffer driver as the 2 W), and (as of Arduino v0.5.0) on-module BCM43430A1 Wi-Fi all working — the loader downloads the CLM regulatory blob the trim-on-build firmware ships without. Sensor bring-up pending. The original Pi Zero (no Wi-Fi) is the same SoC; `rpi_zero_w` cards carry its device tree (`bcm2708-rpi-zero.dtb`) as well, but the board itself is untested ([#7](https://github.com/jetpax/PiZZa/issues/7)). |
 | **Raspberry Pi 3 / 3B / 3B+** | ⚠️ Possibly — **untested** | Same Pi 3 / BCM27xx family (BCM2837), same Cortex-A53. Likely needs config tweaks for the different Wi-Fi part (BCM43438 vs CYW43439 → different firmware blob), Ethernet PHY, and HAT pin layout. Open an issue if you try it. |
 | **Raspberry Pi 4 / 5** | ❌ No | BCM2711 / BCM2712, GIC-based, different MMIO base; uses the upstream [`rpi_4b`](https://docs.zephyrproject.org/latest/boards/raspberrypi/rpi_4b/doc/index.html) / `rpi_5` boards. |
 | **Raspberry Pi Pico / Pico 2 (RP2040 / RP2350)** | ❌ No | Different SoC family entirely. |
@@ -265,6 +265,34 @@ uart:~$
 If no `usbmodem`/`ttyACM` device appears, fall back to the GPIO mini-UART
 at **115200 baud, 8N1** — see [Console options](#console-options).
 
+## Getting back to the boot menu
+
+Your menu pick is persisted in `chosen.txt` on the card's boot partition,
+so a card that goes straight into one app is behaving as designed. Three
+ways back, in order of how little you need to hand:
+
+**From the app.** The shell images take `boot menu`; RetroPiZZa has an
+**Exit to boot menu** entry in its picker.
+
+**From the card.** Put the card in any computer (the boot partition is
+plain FAT and mounts as `PIZZA`) and edit `chosen.txt` to read:
+
+```
+kernel=bootmenu.bin
+```
+
+The next boot stops in the menu and waits for you. Deleting `chosen.txt`
+works too, but that is the fresh-card state, so the menu counts its five
+seconds down and boots the default; the line above makes it wait
+indefinitely. Either way, write one `kernel=` line and nothing else: the
+firmware reads any stray `kernel` token in an included file as a live
+assignment, and a card whose `kernel=` names a file that is not there
+does not boot at all (the ACT LED flashes seven times).
+
+**From the hardware.** Hold a button wired between **GPIO 17 and GND**
+at power-on. That forces the menu whatever `chosen.txt` says, and is the
+escape hatch for a card you cannot get at with a card reader.
+
 ## Try things
 
 ```text
@@ -276,7 +304,7 @@ uart:~$ device list
 # Boot selection (boot-menu cards)
 uart:~$ boot list                          # entries; * = the persisted choice
 uart:~$ boot Arduino                       # persist and reboot into an entry
-uart:~$ boot menu                          # drop the choice, reboot into the menu
+uart:~$ boot menu                          # reboot into the menu and wait there
 
 # Hardware info
 uart:~$ hwinfo devid                       # 64-bit OTP board serial
