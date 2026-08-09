@@ -97,6 +97,36 @@ back up it auto-loads the new sketch. No card swap, no manual re-flash.
 - **`LED_BUILTIN`** = the on-board green ACT LED. **BCM GPIO 29** on the
   Zero 2 W; **BCM GPIO 47** on the original Zero W.
 
+## Pin map
+
+`digitalWrite(n, …)` takes the **Arduino pin number** (the `Dn` column), not
+the 40-pin header position and not the BCM GPIO number. All three differ, and
+they collide misleadingly on 7: GPIO 4 sits on header pin 7, but writing `7`
+in a sketch drives D7, which is GPIO 6 over on header pin 31.
+
+| Arduino | BCM GPIO | Header pin | Also |
+| --- | --- | --- | --- |
+| D0 | GPIO 15 | 10 | UART1 RX (`Serial1`) |
+| D1 | GPIO 14 | 8 | UART1 TX (`Serial1`) |
+| D2 | GPIO 4 | 7 | |
+| D3 | GPIO 17 | 11 | |
+| D4 | GPIO 27 | 13 | |
+| D5 | GPIO 22 | 15 | |
+| D6 | GPIO 5 | 29 | |
+| D7 | GPIO 6 | 31 | |
+| D8 | GPIO 23 | 16 | |
+| D9 | GPIO 24 | 18 | |
+| D10 | GPIO 8 | 24 | SPI0 CE0 |
+| D11 | GPIO 10 | 19 | SPI0 MOSI |
+| D12 | GPIO 9 | 21 | SPI0 MISO |
+| D13 | GPIO 11 | 23 | SPI0 SCLK |
+| D14 | GPIO 29 (2 W) / GPIO 47 (Zero W) | none | on-board ACT LED, `LED_BUILTIN` |
+| D15 | GPIO 12 | 32 | PWM0, `analogWrite()` |
+| D16 | GPIO 13 | 33 | PWM1, `analogWrite()` |
+
+Both boards use the same map so sketches port unchanged, except D14, which
+follows each board's on-board LED.
+
 ## What works
 
 **Pi Zero 2 W:** GPIO, SPI, Wire (I²C), Serial (USB-CDC; mini-UART as `Serial1`),
